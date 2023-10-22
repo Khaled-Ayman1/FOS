@@ -331,25 +331,3 @@ char* str2lower(char *dst, const char *src)
 
 	return dst;
 }
-
-char* strSubs(char* dst[], const char* src)
-{
-
-	int length1 = strlen(src);
-
-	int counter = 0;
-
-	for(int i = 0;i<length1;i++)
-	{
-		*dst[counter] = src[i];
-		for(int j = i+1;j<length1;j++)
-		{
-			*dst[counter] = src[i] + src[j];
-			counter++;
-		}
-	}
-
-	return *dst;
-
-}
-
