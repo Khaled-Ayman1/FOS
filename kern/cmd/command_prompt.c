@@ -387,9 +387,6 @@ int process_command(int number_of_arguments, char** arguments)
 	int index = 0;
 	int length = strlen(arguments[0]);
 
-	char* dst[3*length];
-	strSubs(&*dst,arguments[0]);
-
 	for(int i = 0;i<NUM_OF_COMMANDS;i++)
 	{
 		if(strcmp(arguments[0],commands[i].name) == 0)
@@ -401,25 +398,6 @@ int process_command(int number_of_arguments, char** arguments)
 			LIST_INIT(&foundCommands);
 			break;
 		}
-
-
-
-		for(int j = 0; j<length*3;j++)
-		{
-			char* result = strfind(commands[i].name,dst[j][0]);
-
-			if(result != NULL)
-			{
-				int len = strlen(dst[j]);
-				if(strncmp(result,dst[j],len))
-				{
-					commSub = 1;
-					LIST_INSERT_HEAD(&foundCommands,&commands[i]);
-				}
-			}
-		}
-
-
 
 	}
 
