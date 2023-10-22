@@ -402,13 +402,18 @@ int process_command(int number_of_arguments, char** arguments)
 	}
 
 	if(commFound)
-	{
-		if(commArgsNum != (number_of_arguments - 1))
-		{
-			LIST_INSERT_HEAD(&foundCommands,&commands[index]);
-			return CMD_INV_NUM_ARGS;
-		}
-		return index;
+	    {
+	        if(commArgsNum == -1 && number_of_arguments > 1)
+	        {
+	            return index;
+	        }
+
+	        if(commArgsNum != (number_of_arguments - 1))
+	        {
+	            LIST_INSERT_HEAD(&foundCommands,&commands[index]);
+	            return CMD_INV_NUM_ARGS;
+	        }
+	        return index;
 	}else
 	{
 		if(commSub)
