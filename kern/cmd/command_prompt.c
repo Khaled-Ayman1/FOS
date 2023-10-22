@@ -430,6 +430,7 @@ int process_command(int number_of_arguments, char** arguments)
 			return CMD_INV_NUM_ARGS;
 		}
 		return index;
+
 	}else
 	{
 		if(commSub)
