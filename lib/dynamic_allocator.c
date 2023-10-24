@@ -88,15 +88,15 @@ void print_blocks_list(struct MemBlock_LIST list)
 void initialize_dynamic_allocator(uint32 daStart, uint32 initSizeOfAllocatedSpace)
 {
 
-	if (initSizeOfAllocatedSpace == 0 || initSizeOfAllocatedSpace > DYN_ALLOC_MAX_SIZE)
+	if (initSizeOfAllocatedSpace == 0 || (initSizeOfAllocatedSpace + sizeOfMetaData()) > DYN_ALLOC_MAX_SIZE)
 		return ;
 
 	struct BlockMetaData *initAlloc = (struct BlockMetaData *) daStart;
 	initAlloc->size = initSizeOfAllocatedSpace;
 	initAlloc->is_free = 1;
 
-	LIST_INIT(&BlockLists);
-	LIST_INSERT_HEAD(&BlockLists, initAlloc);
+	LIST_INIT(&BlockList);
+	LIST_INSERT_HEAD(&BlockList, initAlloc);
 
 	//TODO: [PROJECT'23.MS1 - #5] [3] DYNAMIC ALLOCATOR - initialize_dynamic_allocator()
 	//panic("initialize_dynamic_allocator is not implemented yet");
@@ -108,9 +108,78 @@ void initialize_dynamic_allocator(uint32 daStart, uint32 initSizeOfAllocatedSpac
 void *alloc_block_FF(uint32 size)
 {
 	//TODO: [PROJECT'23.MS1 - #6] [3] DYNAMIC ALLOCATOR - alloc_block_FF()
-	panic("alloc_block_FF is not implemented yet");
+
+	if(size == 0)
+		return NULL;
+
+	uint32 allocatedSize = size + sizeOfMetaData();
+	struct BlockMetaData *block, *exStart, *allocated = NULL;
+
+	exStart = LIST_LAST(&BlockList);
+	void *heapLimit;
+
+	LIST_FOREACH(block, &BlockList){
+
+		if((block->size >= allocatedSize) && block->is_free != 0){
+
+			uint32 block_size = block->size;
+
+			allocated = block;
+			allocated->size = allocatedSize;
+			allocated->is_free = 0;
+
+			block = (void *) block + allocatedSize;
+
+			LIST_INSERT_BEFORE(&BlockList, block, allocated);
+
+
+			if(block_size == allocatedSize){
+
+				block->is_free = 0;
+				LIST_REMOVE(&BlockList, block);
+
+			}
+			else
+
+				block->size = block_size - allocatedSize;
+				block->is_free = 1;
+
+			return ((void *) allocated + sizeOfMetaData());
+		}
+	}
+
+	if((uint32)sbrk(0) == ((uint32)exStart + exStart->size)){
+
+		if(exStart->is_free != 0){
+
+			heapLimit = sbrk(allocatedSize);
+
+			if(heapLimit == (void *)-1)
+				return NULL;
+
+			allocated = heapLimit;
+
+			return ((void *) allocated + sizeOfMetaData());
+		}
+
+		heapLimit = sbrk((allocatedSize) - (exStart->size));
+
+		if(heapLimit == (void *)-1)
+			return NULL;
+
+		allocated = exStart;
+		allocated->size = allocatedSize;
+		allocated->is_free = 0;
+
+		LIST_REMOVE(&BlockList, exStart);
+		LIST_INSERT_TAIL(&BlockList, allocated);
+
+		return ((void *) allocated + sizeOfMetaData());
+	}
+
 	return NULL;
 }
+
 //=========================================
 // [5] ALLOCATE BLOCK BY BEST FIT:
 //=========================================

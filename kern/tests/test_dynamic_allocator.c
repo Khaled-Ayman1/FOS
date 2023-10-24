@@ -133,9 +133,14 @@ int test_initial_alloc(int ALLOC_STRATEGY)
 			*(midVAs[idx]) = idx ;
 			*(endVAs[idx]) = idx ;
 			idx++;
+
+			//print_blocks_list(BlockList);
+			//cprintf("\nHead Info\n Size = %d\n Free = %d\n", (&BlockList)->lh_first->size, (&BlockList)->lh_first->is_free);
+			//cprintf("\nTail Info\n Size = %d\n Free = %d\n", (&BlockList)->lh_last->size, (&BlockList)->lh_last->is_free);
 		}
+		//------TEST------//
 		//if (is_correct == 0)
-		//break;
+			//break;
 	}
 	if (is_correct)
 	{
@@ -155,6 +160,10 @@ int test_initial_alloc(int ALLOC_STRATEGY)
 	{
 		is_correct = 0;
 		cprintf("alloc_block_xx #4: WRONG ALLOC - alloc_block_xx return wrong address.\n");
+
+		//--TEST--//
+		cprintf("Expected: %x Actual: %x\n", curVA + sizeOfMetaData(), va);
+		//--TEST--//
 	}
 	*(startVAs[idx]) = idx ;
 	*(midVAs[idx]) = idx ;
@@ -200,7 +209,6 @@ void test_alloc_block_FF()
 	cprintf("FIRST: Tests depend on the Allocate Function ONLY [40%]\n") ;
 	cprintf("=======================================================\n") ;
 	eval = test_initial_alloc(DA_FF);
-
 	cprintf("====================================================\n") ;
 	cprintf("SECOND: Tests depend on BOTH Allocate and Free [60%] \n") ;
 	cprintf("====================================================\n") ;
