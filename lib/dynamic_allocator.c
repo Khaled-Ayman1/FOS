@@ -144,17 +144,25 @@ void *alloc_block_FF(uint32 size)
 		}
 	}
 
-	if((uint32)sbrk(0) == ((uint32)exStart + exStart->size)){
+	heapLimit = sbrk(0);
 
-		if(exStart->is_free != 0){
+	if((uint32)heapLimit == ((uint32)exStart + exStart->size)){
+
+		if(exStart->is_free == 0){
 
 			heapLimit = sbrk(allocatedSize);
 
 			if(heapLimit == (void *)-1)
 				return NULL;
 
-
 			allocated = heapLimit;
+			allocated->size = allocatedSize;
+			allocated->is_free = 0;
+
+			LIST_INSERT_TAIL(&BlockList, allocated);
+
+			//In case LIST_INSERT_TAIL fails uncomment the following:
+			//LIST_INSERT_AFTER(&BlockList, exStart, allocated);
 
 			return ((void *) allocated + sizeOfMetaData());
 		}
@@ -167,9 +175,6 @@ void *alloc_block_FF(uint32 size)
 		allocated = exStart;
 		allocated->size = allocatedSize;
 		allocated->is_free = 0;
-
-		LIST_REMOVE(&BlockList, exStart);
-		LIST_INSERT_TAIL(&BlockList, allocated);
 
 		return ((void *) allocated + sizeOfMetaData());
 	}
