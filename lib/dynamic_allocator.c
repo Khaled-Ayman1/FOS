@@ -105,6 +105,8 @@ void initialize_dynamic_allocator(uint32 daStart, uint32 initSizeOfAllocatedSpac
 //=========================================
 // [4] ALLOCATE BLOCK BY FIRST FIT:
 //=========================================
+
+
 void *alloc_block_FF(uint32 size)
 {
 	//TODO: [PROJECT'23.MS1 - #6] [3] DYNAMIC ALLOCATOR - alloc_block_FF()
@@ -121,7 +123,7 @@ void *alloc_block_FF(uint32 size)
 
 	LIST_FOREACH(block, &BlockList){
 
-		if((block->size >= allocatedSize) && block->is_free != 0){
+		if((block->size >= allocatedSize) && block->is_free == 1){
 
 			uint32 block_size = block->size;
 
@@ -129,21 +131,14 @@ void *alloc_block_FF(uint32 size)
 			allocated->size = allocatedSize;
 			allocated->is_free = 0;
 
-			block = (void *) block + allocatedSize;
 
-			LIST_INSERT_BEFORE(&BlockList, block, allocated);
+			if(block_size != allocatedSize) {
 
-
-			if(block_size == allocatedSize){
-
-				block->is_free = 0;
-				LIST_REMOVE(&BlockList, block);
-
+				struct BlockMetaData *newBlock = (void *) block + allocatedSize;
+				LIST_INSERT_AFTER(&BlockList, block, newBlock );
+				newBlock->size = block_size - allocatedSize;
+				newBlock->is_free = 1;
 			}
-			else
-
-				block->size = block_size - allocatedSize;
-				block->is_free = 1;
 
 			return ((void *) allocated + sizeOfMetaData());
 		}
@@ -157,6 +152,7 @@ void *alloc_block_FF(uint32 size)
 
 			if(heapLimit == (void *)-1)
 				return NULL;
+
 
 			allocated = heapLimit;
 
@@ -177,6 +173,7 @@ void *alloc_block_FF(uint32 size)
 
 		return ((void *) allocated + sizeOfMetaData());
 	}
+
 
 	return NULL;
 }
@@ -215,7 +212,52 @@ void *alloc_block_NF(uint32 size)
 void free_block(void *va)
 {
 	//TODO: [PROJECT'23.MS1 - #7] [3] DYNAMIC ALLOCATOR - free_block()
-	panic("free_block is not implemented yet");
+	//panic("free_block is not implemented yet");
+
+	if (va == NULL) return;
+
+	struct BlockMetaData *block_to_free = (struct BlockMetaData *) (va - sizeOfMetaData());
+
+
+	struct BlockMetaData *nextBlock = LIST_NEXT(block_to_free);
+	struct BlockMetaData *prevBlock = LIST_PREV(block_to_free);
+
+
+	//merge with the one after it if the next is free
+	if (nextBlock && nextBlock->is_free==1) {
+
+
+		block_to_free->size += nextBlock->size;
+
+		//zeroING
+		nextBlock->size = 0;
+		nextBlock->is_free = 0;
+
+		//remove the next free block, the current freed block will be the merge of both
+		LIST_REMOVE(&BlockList, nextBlock);
+
+	}
+
+
+	//point to prev if it is free, can happen simultaneous with previous the IF that checks for next
+	if (prevBlock && prevBlock->is_free==1) {
+
+		prevBlock->size += block_to_free->size ;
+
+		//zeroING
+		block_to_free->size = 0;
+		block_to_free->is_free = 0;
+
+		//remove the current freed block as the previous free block is now the merge of both
+		LIST_REMOVE(&BlockList, block_to_free);
+
+		block_to_free = prevBlock;
+
+	}
+
+	block_to_free->is_free = 1;
+
+
 }
 
 //=========================================
