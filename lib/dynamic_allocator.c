@@ -265,6 +265,118 @@ void free_block(void *va)
 void *realloc_block_FF(void* va, uint32 new_size)
 {
 	//TODO: [PROJECT'23.MS1 - #8] [3] DYNAMIC ALLOCATOR - realloc_block_FF()
-	panic("realloc_block_FF is not implemented yet");
+	//panic("realloc_block_FF is not implemented yet");
+
+	struct BlockMetaData *currBlock = (struct BlockMetaData *) (va - sizeOfMetaData());
+	struct BlockMetaData *nextBlock = LIST_NEXT(currBlock);
+	struct BlockMetaData *prevBlock = LIST_PREV(currBlock);
+
+	uint32 total_size = new_size + sizeOfMetaData();
+
+
+	//The possible 5 cases: special, no split, split, need to allocate somewhere else, decreasing, we are at top so no nextBlock
+
+
+	//CASE#0: special cases, if va is null or size is 0 or both
+	if (va == NULL && new_size == 0)   //realloc_block_FF(NULL, 0)
+		return NULL;
+	else if (new_size == 0) {         //realloc_block_FF(va, 0)
+		free_block(va);
+		return NULL;
+	}
+	else if (va == NULL)               //realloc_block_FF(NULL, n)
+		return alloc_block_FF(new_size);
+
+
+
+
+	//CASE#1: size increasing and no splitting
+	if (nextBlock->is_free == 1  &&  total_size == (currBlock->size + nextBlock->size)) {
+
+		currBlock->size = total_size;
+
+		//zeroING nextBlock as it is now completely merged with currBlock
+		nextBlock->is_free = 0;
+		nextBlock->size = 0;
+
+		LIST_REMOVE(&BlockList, nextBlock);
+
+		return (void*)currBlock + sizeOfMetaData();
+	}
+
+	//CASE#2: size increasing with splitting
+	else if (nextBlock->is_free == 1  &&  total_size < (currBlock->size + nextBlock->size)) {
+
+		uint32 nextBlockSize = nextBlock->size; //saving its size
+		//zeroIng the old nextBlock
+		nextBlock->is_free = 0;
+		nextBlock->size = 0;
+		//the new nextBlock
+		nextBlock = (void*) nextBlock + (total_size - currBlock->size);
+		nextBlock->is_free = 1;
+		nextBlock->size = (currBlock->size + nextBlockSize) - total_size;
+
+		currBlock->size = total_size;
+
+		return (void*)currBlock + sizeOfMetaData();
+	}
+
+	//CASE#3: need more than what's available in current plus next
+	else if (nextBlock->is_free == 1  &&  total_size > (currBlock->size + nextBlock->size)) {
+		free_block(currBlock + sizeOfMetaData());
+		return alloc_block_FF(new_size); //alloc takes the size without metadata, hence not passing total_size
+	}
+
+
+	//CASE#4: size decreasing case
+	else if (total_size < currBlock->size) {
+
+		//1st sub-case: there is a block after it and it is free
+		if (nextBlock  &&  nextBlock->is_free == 1) {
+
+			uint32 nextBlockSize = nextBlock->size; //saving its size
+
+			//zeroIng old nextBlock
+			nextBlock->is_free = 0;
+			nextBlock->size = 0;
+
+			//new nextBlock
+			nextBlock = (void*)nextBlock - (currBlock->size - total_size);
+			nextBlock->is_free = 1;
+			nextBlock->size = nextBlockSize + (currBlock->size - total_size);
+
+		}
+
+		//2nd sub-case: there is either no block after it (it's last) or it is not free
+		//create a new free one in either cases
+		else {
+			struct BlockMetaData *newFreeBlock = (void*)currBlock + total_size;
+			newFreeBlock->is_free = 1;
+
+			newFreeBlock->size = currBlock->size - total_size;
+			LIST_INSERT_AFTER(&BlockList, currBlock, newFreeBlock);
+		}
+
+
+		currBlock->size = total_size;
+		return (void*) currBlock + sizeOfMetaData();
+
+	}
+
+
+	//CASE#5: if we are at the top and there is no nextBlock or nextBlock is a zero sized block or the next Block is not free
+	if (!nextBlock || (nextBlock && nextBlock->size==0) || (nextBlock && nextBlock->is_free==0)) {
+
+		if (total_size == currBlock->size)
+			return (void*)currBlock + sizeOfMetaData();
+		else if (total_size > currBlock->size) {
+			free_block(currBlock+sizeOfMetaData());
+			return alloc_block_FF(new_size);
+		}
+		//the case of total_size being less than is covered in case#4 in its 2nd sub-case
+
+	}
+
+
 	return NULL;
 }
