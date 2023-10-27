@@ -257,6 +257,12 @@ int sys_pf_calculate_allocated_pages(void)
 /*******************************/
 void sys_free_user_mem(uint32 virtual_address, uint32 size)
 {
+
+	if((uint32*)virtual_address==NULL||virtual_address>=USER_LIMIT||virtual_address>=(USER_LIMIT - PAGE_SIZE))
+	{
+		sched_kill_env(curenv->env_id);
+	}
+
 	if(isBufferingEnabled())
 	{
 		__free_user_mem_with_buffering(curenv, virtual_address, size);
@@ -270,6 +276,11 @@ void sys_free_user_mem(uint32 virtual_address, uint32 size)
 
 void sys_allocate_user_mem(uint32 virtual_address, uint32 size)
 {
+	if((uint32*)virtual_address==NULL||virtual_address>=USER_LIMIT)
+	{
+		sched_kill_env(curenv->env_id);
+	}
+
 	allocate_user_mem(curenv, virtual_address, size);
 	return;
 }
@@ -482,7 +493,7 @@ void* sys_sbrk(int increment)
 {
 	//TODO: [PROJECT'23.MS2 - #08] [2] USER HEAP - Block Allocator - sys_sbrk() [Kernel Side]
 	//MS2: COMMENT THIS LINE BEFORE START CODING====
-	return (void*)-1 ;
+	return (void*)-1;
 	//====================================================
 
 	/*2023*/
@@ -521,7 +532,20 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 	{
 	/*2023*/
 	//TODO: [PROJECT'23.MS1 - #4] [2] SYSTEM CALLS - Add suitable code here
+	case SYS_sbrk:
 
+	    return (uint32)sys_sbrk((int)a1);
+	    break;
+
+	case SYS_allocate_user_mem:
+		sys_allocate_user_mem(a1, a2);
+				return 0;
+				break;
+
+	case SYS_free_user_mem:
+		sys_free_user_mem(a1, a2);
+				return 0;
+				break;
 	//=====================================================================
 	case SYS_cputs:
 		sys_cputs((const char*)a1,a2,(uint8)a3);
