@@ -189,8 +189,70 @@ void *alloc_block_FF(uint32 size)
 void *alloc_block_BF(uint32 size)
 {
 	//TODO: [PROJECT'23.MS1 - BONUS] [3] DYNAMIC ALLOCATOR - alloc_block_BF()
-	panic("alloc_block_BF is not implemented yet");
+	//panic("alloc_block_BF is not implemented yet");
+
+	if(size == 0)
+		return NULL;
+
+
+	uint32 allocatedSize = size + sizeOfMetaData();
+	uint32 minSize = 0;
+	struct BlockMetaData *block, *allocated = NULL;
+	void *heapLimit;
+	int blockFound = 0;
+	int firstBlock = 1;
+
+	LIST_FOREACH(block, &BlockList)
+	{
+		if(block->is_free == 1 && block->size >= allocatedSize && firstBlock)
+		{
+			blockFound = 1;
+			firstBlock = 0;
+			minSize = block->size;
+			allocated = block;
+		}
+
+		if(blockFound && block->is_free == 1 && block->size >= allocatedSize && block->size < minSize)
+		{
+			minSize = block->size;
+			allocated = block;
+		}
+
+	}
+
+	if(blockFound)
+	{
+		allocated->size = allocatedSize;
+		allocated->is_free = 0;
+
+		if(minSize != allocatedSize) {
+
+			struct BlockMetaData *newBlock = (void *) allocated + allocatedSize;
+			LIST_INSERT_AFTER(&BlockList, allocated, newBlock );
+			newBlock->size = minSize - allocatedSize;
+			newBlock->is_free = 1;
+		}
+
+
+
+		return ((void *) allocated + sizeOfMetaData());
+	}
+	else
+	{
+
+		heapLimit = sbrk(allocatedSize);
+
+		if(heapLimit == (void *)-1)
+			return NULL;
+
+		allocated = heapLimit;
+		allocated->size = allocatedSize;
+		allocated->is_free = 0;
+		return ((void *) allocated + sizeOfMetaData());
+	}
+
 	return NULL;
+
 }
 
 //=========================================
