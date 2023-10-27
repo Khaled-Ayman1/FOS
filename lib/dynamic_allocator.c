@@ -284,16 +284,13 @@ void *realloc_block_FF(void* va, uint32 new_size)
 
 
 	//CASE#0: special cases, if va is null or size is 0 or both
-	if (va == NULL && new_size == 0)   //realloc_block_FF(NULL, 0)
-		return NULL;
-	else if (new_size == 0) {         //realloc_block_FF(va, 0)
+
+	if (va == NULL)
+		return alloc_block_FF(new_size);
+	else if (new_size == 0) {
 		free_block(va);
 		return NULL;
 	}
-	else if (va == NULL)               //realloc_block_FF(NULL, n)
-		return alloc_block_FF(new_size);
-
-
 
 
 	//CASE#1: size increasing and no splitting
