@@ -1500,9 +1500,9 @@ void test_realloc_block_FF()
 		is_correct = 1;
 		{
 
-			blockIndex = 2*allocCntPerSize - 1; /*1B*/
+			blockIndex = 3*allocCntPerSize - 1; /*1B*/
 
-			old_size = allocSizes[1] /*1KB*/;
+			old_size = allocSizes[2] /*1KB*/;
 			new_size = old_size - 10;
 
 			uint32 next_size = get_block_size(startVAs[blockIndex + 1]);

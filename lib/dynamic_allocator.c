@@ -111,7 +111,7 @@ void *alloc_block_FF(uint32 size)
 {
 	//TODO: [PROJECT'23.MS1 - #6] [3] DYNAMIC ALLOCATOR - alloc_block_FF()
 
-	if(size == 0)
+	if(size <= 0)
 		return NULL;
 
 	uint32 allocatedSize = size + sizeOfMetaData();
@@ -134,10 +134,18 @@ void *alloc_block_FF(uint32 size)
 
 			if(block_size != allocatedSize) {
 
+				if((block_size - allocatedSize) < sizeOfMetaData())
+
+					allocated->size = block_size;
+
+				else{
+
 				struct BlockMetaData *newBlock = (void *) block + allocatedSize;
 				LIST_INSERT_AFTER(&BlockList, block, newBlock );
 				newBlock->size = block_size - allocatedSize;
 				newBlock->is_free = 1;
+
+				}
 			}
 
 			return ((void *) allocated + sizeOfMetaData());
@@ -191,7 +199,7 @@ void *alloc_block_BF(uint32 size)
 	//TODO: [PROJECT'23.MS1 - BONUS] [3] DYNAMIC ALLOCATOR - alloc_block_BF()
 	//panic("alloc_block_BF is not implemented yet");
 
-	if(size == 0)
+	if(size <= 0)
 		return NULL;
 
 
@@ -200,19 +208,24 @@ void *alloc_block_BF(uint32 size)
 	struct BlockMetaData *block, *allocated = NULL;
 	void *heapLimit;
 	int blockFound = 0;
-	int firstBlock = 1;
+	int initBlock = 1;
+
+	if(LIST_SIZE(&BlockList) == 1404)
+		print_blocks_list(BlockList);
 
 	LIST_FOREACH(block, &BlockList)
 	{
-		if(block->is_free == 1 && block->size >= allocatedSize && firstBlock)
+
+		if((block->is_free == 1) && (block->size >= allocatedSize) && initBlock)
 		{
 			blockFound = 1;
-			firstBlock = 0;
+			initBlock = 0;
 			minSize = block->size;
 			allocated = block;
+			continue;
 		}
 
-		if(blockFound && block->is_free == 1 && block->size >= allocatedSize && block->size < minSize)
+		if(blockFound && block->is_free && block->size >= allocatedSize && block->size < minSize)
 		{
 			minSize = block->size;
 			allocated = block;
@@ -233,10 +246,9 @@ void *alloc_block_BF(uint32 size)
 			newBlock->is_free = 1;
 		}
 
-
-
 		return ((void *) allocated + sizeOfMetaData());
 	}
+
 	else
 	{
 
