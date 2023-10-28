@@ -140,10 +140,10 @@ void *alloc_block_FF(uint32 size)
 
 				else{
 
-				struct BlockMetaData *newBlock = (void *) block + allocatedSize;
-				LIST_INSERT_AFTER(&BlockList, block, newBlock );
-				newBlock->size = block_size - allocatedSize;
-				newBlock->is_free = 1;
+					struct BlockMetaData *newBlock = (void *) block + allocatedSize;
+					LIST_INSERT_AFTER(&BlockList, block, newBlock );
+					newBlock->size = block_size - allocatedSize;
+					newBlock->is_free = 1;
 
 				}
 			}
@@ -205,13 +205,12 @@ void *alloc_block_BF(uint32 size)
 
 	uint32 allocatedSize = size + sizeOfMetaData();
 	uint32 minSize = 0;
+
 	struct BlockMetaData *block, *allocated = NULL;
+
 	void *heapLimit;
 	int blockFound = 0;
 	int initBlock = 1;
-
-	if(LIST_SIZE(&BlockList) == 1404)
-		print_blocks_list(BlockList);
 
 	LIST_FOREACH(block, &BlockList)
 	{
@@ -240,10 +239,17 @@ void *alloc_block_BF(uint32 size)
 
 		if(minSize != allocatedSize) {
 
-			struct BlockMetaData *newBlock = (void *) allocated + allocatedSize;
-			LIST_INSERT_AFTER(&BlockList, allocated, newBlock );
-			newBlock->size = minSize - allocatedSize;
-			newBlock->is_free = 1;
+			if((minSize - allocatedSize) < sizeOfMetaData())
+
+				allocated->size = minSize;
+
+			else{
+
+				struct BlockMetaData *newBlock = (void *) allocated + allocatedSize;
+				LIST_INSERT_AFTER(&BlockList, allocated, newBlock );
+				newBlock->size = minSize - allocatedSize;
+				newBlock->is_free = 1;
+			}
 		}
 
 		return ((void *) allocated + sizeOfMetaData());
