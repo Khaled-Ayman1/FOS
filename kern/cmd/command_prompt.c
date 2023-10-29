@@ -390,7 +390,7 @@ int process_command(int number_of_arguments, char** arguments)
 	for(int i = 0;i<NUM_OF_COMMANDS;i++)
 	{
 
-		int len = strlen(commands[i].name);
+		int len = 0;
 		if(strcmp(arguments[0],commands[i].name) == 0)
 		{
 			commFound = 1;
@@ -401,14 +401,26 @@ int process_command(int number_of_arguments, char** arguments)
 			break;
 		}
 
-		for(int j = 0;j<len;j++)
+		for(int j = 0;j<length;j++)
 		{
-			char* result = strfind(arguments[0],commands[i].name[j]);
-
-			if(strcmp(result,&commands[i].name[j]) == 0)
+			char* result = strfind(commands[i].name,arguments[0][j]);
+			if(j < length - 1)
 			{
-				cprintf("%c",*result);
-				cprintf("\n");
+				char* result2 = strfind(commands[i].name,arguments[0][j + 1]);
+				if(result > result2)
+				{
+					break;
+				}
+			}
+			if(strncmp(&arguments[0][j],result,1) == 0)
+			{
+				len++;
+			}
+
+
+
+			if(len == length)
+			{
 				commSub = 1;
 				LIST_INSERT_HEAD(&foundCommands,&commands[i]);
 				break;
