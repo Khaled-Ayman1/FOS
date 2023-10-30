@@ -406,7 +406,11 @@ int process_command(int number_of_arguments, char** arguments)
 			char* result = strfind(commands[i].name,arguments[0][j]);
 			if(j < length - 1)
 			{
-				char* result2 = strfind(commands[i].name,arguments[0][j + 1]);
+				char* result2 = strfind(result,arguments[0][j + 1]);
+				if(*result2 == '\0' || *result == '\0')
+				{
+					break;
+				}
 				if(result > result2)
 				{
 					break;
@@ -416,9 +420,6 @@ int process_command(int number_of_arguments, char** arguments)
 			{
 				len++;
 			}
-
-
-
 			if(len == length)
 			{
 				commSub = 1;
