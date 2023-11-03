@@ -64,7 +64,6 @@ struct Command commands[] =
 		{"lru", "set replacement algorithm to LRU", command_set_page_rep_LRU, 1},
 		{"nclock", "set replacement algorithm to Nth chance CLOCK", command_set_page_rep_nthCLOCK, 1},
 		{"modbufflength", "set the length of the modified buffer", command_set_modified_buffer_length, 1},
-		{"strlower","",command_str2lower,1},
 
 		//******************************//
 		/* COMMANDS WITH TWO ARGUMENTS */
@@ -399,11 +398,13 @@ struct Env * CreateEnv(int number_of_arguments, char **arguments)
 
 			break;
 		}
+#if USE_KHEAP == 0
 		if(pageWSSize > __PWS_MAX_SIZE)
 		{
 			cprintf("ERROR: size of WS must be less than or equal to %d... aborting", __PWS_MAX_SIZE);
 			return NULL;
 		}
+#endif
 		if(isPageReplacmentAlgorithmLRU(PG_REP_LRU_LISTS_APPROX))
 		{
 			if (LRUSecondListSize > pageWSSize - 1)
@@ -842,13 +843,4 @@ int command_get_modified_buffer_length(int number_of_arguments, char **arguments
 int command_tst(int number_of_arguments, char **arguments)
 {
 	return tst_handler(number_of_arguments, arguments);
-}
-
-int command_str2lower(int number_of_arguments, char **arguments)
-{
-	char* result = arguments[1];
-	str2lower(result,arguments[1]);
-	cprintf((char*)result);
-	cprintf("\n");
-	return 0;
 }
