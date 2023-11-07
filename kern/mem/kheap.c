@@ -83,8 +83,60 @@ void* sbrk(int increment)
 	 */
 
 	//MS2: COMMENT THIS LINE BEFORE START CODING====
-	return (void*)-1 ;
-	panic("not implemented yet");
+	//return (void*)-1 ;
+	//panic("not implemented yet");
+
+	if (increment == 0)
+		return (void*)kbreak;
+
+	uint32 exStart = kbreak;
+
+	if(increment > 0 && increment + kbreak < khl)
+	{
+		int numPages = increment / PAGE_SIZE;
+		kbreak = kbreak + (numPages * PAGE_SIZE) + 1;
+		uint32 *ptr_page_table = NULL;
+		int ret = get_page_table(ptr_page_directory, exStart, &ptr_page_table);
+		if(ret == TABLE_IN_MEMORY)
+		{
+			struct FrameInfo *ptr_frame_info;
+			int fret = allocate_frame(&ptr_frame_info);
+			if(fret == 0)
+			{
+				int mret = map_frame(ptr_page_directory, ptr_frame_info, exStart, PERM_WRITEABLE);
+				if(mret == 0)
+				{
+					//
+					return (void*)exStart;
+				}
+			}
+
+		}else
+		{
+			ptr_page_table = create_page_table(ptr_page_directory, exStart);
+			struct FrameInfo *ptr_frame_info;
+			int fret = allocate_frame(&ptr_frame_info);
+			if(fret == 0)
+			{
+				int mret = map_frame(ptr_page_directory, ptr_frame_info, exStart, PERM_WRITEABLE);
+				if(mret == 0)
+				{
+					//
+					return (void*)exStart;
+				}
+			}
+		}
+	}
+
+	if(increment < 0)
+	{
+		int numPages = (increment / PAGE_SIZE) + 1;
+		kbreak = kbreak - (numPages * PAGE_SIZE);
+		unmap_frame(ptr_page_directory, kbreak);
+		return (void *)kbreak;
+	}
+	panic("negawatt");
+
 }
 
 
