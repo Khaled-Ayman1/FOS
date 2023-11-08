@@ -26,38 +26,67 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 	kstart = daStart;
 	kbreak = initSizeToAllocate;
 	khl = daLimit;
+	uint32 iteration = initSizeToAllocate/PAGE_SIZE;
+	int mappingDone = 0;
 
-
-	uint32 *ptr_page_table = NULL;
-	int ret = get_page_table(ptr_page_directory, kstart, &ptr_page_table);
-	if(ret == TABLE_IN_MEMORY)
+	if(initSizeToAllocate%PAGE_SIZE != 0)
 	{
-		struct FrameInfo *ptr_frame_info;
-		int fret = allocate_frame(&ptr_frame_info);
-		if(fret == 0)
+		iteration++;
+	}
+
+	uint32 pagePtr = kstart;
+
+	for(int i = 0;i<iteration;i++)
+	{
+		uint32 *ptr_page_table = NULL;
+		int ret = get_page_table(ptr_page_directory, pagePtr, &ptr_page_table);
+
+		if(ret == TABLE_IN_MEMORY)
 		{
-			int mret = map_frame(ptr_page_directory, ptr_frame_info, kstart, PERM_WRITEABLE);
-			if(mret == 0)
+			struct FrameInfo *ptr_frame_info;
+			int fret = allocate_frame(&ptr_frame_info);
+
+			if(fret == 0)
 			{
-				initialize_dynamic_allocator(kstart, kbreak);
-				return 0;
+				int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
+				if(mret == 0)
+				{
+					mappingDone = 1;
+				}else
+				{
+					mappingDone = 0;
+					break;
+				}
+			}
+
+		}else
+		{
+			ptr_page_table = create_page_table(ptr_page_directory, pagePtr);
+			struct FrameInfo *ptr_frame_info;
+
+			int fret = allocate_frame(&ptr_frame_info);
+
+			if(fret == 0)
+			{
+				int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
+				if(mret == 0)
+				{
+					mappingDone = 1;
+				}else
+				{
+					mappingDone = 0;
+					break;
+				}
 			}
 		}
 
-	}else
-	{
-		ptr_page_table = create_page_table(ptr_page_directory, kstart);
-		struct FrameInfo *ptr_frame_info;
-		int fret = allocate_frame(&ptr_frame_info);
-		if(fret == 0)
-		{
-			int mret = map_frame(ptr_page_directory, ptr_frame_info, kstart, PERM_WRITEABLE);
-			if(mret == 0)
-			{
-				initialize_dynamic_allocator(kstart, kbreak);
-				return 0;
-			}
-		}
+		pagePtr += PAGE_SIZE;
+
+	}
+
+	if(mappingDone){
+		initialize_dynamic_allocator(kstart, kbreak);
+		return 0;
 	}
 
 
@@ -145,6 +174,7 @@ void* sbrk(int increment)
 	}
 
 	panic("negawatt");
+	return (void*)-1;
 }
 
 
