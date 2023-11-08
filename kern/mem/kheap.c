@@ -94,7 +94,12 @@ void* sbrk(int increment)
 	if(increment > 0 && increment + kbreak < khl)
 	{
 		int numPages = increment / PAGE_SIZE;
-		kbreak = kbreak + (numPages * PAGE_SIZE) + 1;
+
+		if(increment % PAGE_SIZE == 0)
+			kbreak += (numPages * PAGE_SIZE);
+		else
+			kbreak = kbreak + ((numPages + 1) * PAGE_SIZE);
+
 		uint32 *ptr_page_table = NULL;
 		int ret = get_page_table(ptr_page_directory, exStart, &ptr_page_table);
 		if(ret == TABLE_IN_MEMORY)
@@ -106,7 +111,7 @@ void* sbrk(int increment)
 				int mret = map_frame(ptr_page_directory, ptr_frame_info, exStart, PERM_WRITEABLE);
 				if(mret == 0)
 				{
-					//
+					//check
 					return (void*)exStart;
 				}
 			}
@@ -130,13 +135,16 @@ void* sbrk(int increment)
 
 	if(increment < 0)
 	{
-		int numPages = (increment / PAGE_SIZE) + 1;
+
+		int numPages = (increment / PAGE_SIZE);
+		if(increment % PAGE_SIZE != 0)
+			numPages++;
 		kbreak = kbreak - (numPages * PAGE_SIZE);
 		unmap_frame(ptr_page_directory, kbreak);
 		return (void *)kbreak;
 	}
-	panic("negawatt");
 
+	panic("negawatt");
 }
 
 
@@ -147,7 +155,31 @@ void* kmalloc(unsigned int size)
 	// use "isKHeapPlacementStrategyFIRSTFIT() ..." functions to check the current strategy
 
 	//change this "return" according to your answer
-	kpanic_into_prompt("kmalloc() is not implemented yet...!!");
+
+	if(size <= 0)
+		return NULL;
+
+	struct FrameInfo *ptr_frame_info;
+
+	if(isKHeapPlacementStrategyFIRSTFIT()){
+
+		if(size <= DYN_ALLOC_MAX_BLOCK_SIZE)
+			return alloc_block_FF(size);
+
+
+		return NULL;
+	}
+
+
+	if(isKHeapPlacementStrategyBESTFIT())
+	{
+
+		//BONUS
+
+	}
+
+
+	//kpanic_into_prompt("kmalloc() is not implemented yet...!!");
 	return NULL;
 }
 

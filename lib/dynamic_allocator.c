@@ -168,6 +168,8 @@ void *alloc_block_FF(uint32 size)
 
 		if(exStart->is_free == 0){
 
+			//recheck that part, sbrk calls multiples of 4kb, handle the extra storage
+
 			heapLimit = sbrk(allocatedSize);
 
 			if(heapLimit == (void *)-1)
