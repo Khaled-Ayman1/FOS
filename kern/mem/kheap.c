@@ -16,8 +16,52 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 	//	Otherwise (if no memory OR initial size exceed the given limit): E_NO_MEM
 
 	//Comment the following line(s) before start coding...
-	panic("not implemented yet");
-	return 0;
+	//panic("not implemented yet");
+
+	if(initSizeToAllocate > daLimit)
+	{
+		return E_NO_MEM;
+	}
+
+	kstart = daStart;
+	kbreak = initSizeToAllocate;
+	khl = daLimit;
+
+
+	uint32 *ptr_page_table = NULL;
+	int ret = get_page_table(ptr_page_directory, kstart, &ptr_page_table);
+	if(ret == TABLE_IN_MEMORY)
+	{
+		struct FrameInfo *ptr_frame_info;
+		int fret = allocate_frame(&ptr_frame_info);
+		if(fret == 0)
+		{
+			int mret = map_frame(ptr_page_directory, ptr_frame_info, kstart, PERM_WRITEABLE);
+			if(mret == 0)
+			{
+				initialize_dynamic_allocator(kstart, kbreak);
+				return 0;
+			}
+		}
+
+	}else
+	{
+		ptr_page_table = create_page_table(ptr_page_directory, kstart);
+		struct FrameInfo *ptr_frame_info;
+		int fret = allocate_frame(&ptr_frame_info);
+		if(fret == 0)
+		{
+			int mret = map_frame(ptr_page_directory, ptr_frame_info, kstart, PERM_WRITEABLE);
+			if(mret == 0)
+			{
+				initialize_dynamic_allocator(kstart, kbreak);
+				return 0;
+			}
+		}
+	}
+
+
+	return E_NO_MEM;
 }
 
 void* sbrk(int increment)
@@ -39,8 +83,60 @@ void* sbrk(int increment)
 	 */
 
 	//MS2: COMMENT THIS LINE BEFORE START CODING====
-	return (void*)-1 ;
-	panic("not implemented yet");
+	//return (void*)-1 ;
+	//panic("not implemented yet");
+
+	if (increment == 0)
+		return (void*)kbreak;
+
+	uint32 exStart = kbreak;
+
+	if(increment > 0 && increment + kbreak < khl)
+	{
+		int numPages = increment / PAGE_SIZE;
+		kbreak = kbreak + (numPages * PAGE_SIZE) + 1;
+		uint32 *ptr_page_table = NULL;
+		int ret = get_page_table(ptr_page_directory, exStart, &ptr_page_table);
+		if(ret == TABLE_IN_MEMORY)
+		{
+			struct FrameInfo *ptr_frame_info;
+			int fret = allocate_frame(&ptr_frame_info);
+			if(fret == 0)
+			{
+				int mret = map_frame(ptr_page_directory, ptr_frame_info, exStart, PERM_WRITEABLE);
+				if(mret == 0)
+				{
+					//
+					return (void*)exStart;
+				}
+			}
+
+		}else
+		{
+			ptr_page_table = create_page_table(ptr_page_directory, exStart);
+			struct FrameInfo *ptr_frame_info;
+			int fret = allocate_frame(&ptr_frame_info);
+			if(fret == 0)
+			{
+				int mret = map_frame(ptr_page_directory, ptr_frame_info, exStart, PERM_WRITEABLE);
+				if(mret == 0)
+				{
+					//
+					return (void*)exStart;
+				}
+			}
+		}
+	}
+
+	if(increment < 0)
+	{
+		int numPages = (increment / PAGE_SIZE) + 1;
+		kbreak = kbreak - (numPages * PAGE_SIZE);
+		unmap_frame(ptr_page_directory, kbreak);
+		return (void *)kbreak;
+	}
+	panic("negawatt");
+
 }
 
 
