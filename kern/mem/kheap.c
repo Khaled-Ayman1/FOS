@@ -122,55 +122,85 @@ void* sbrk(int increment)
 
 	if(increment > 0 && increment + kbreak < khl)
 	{
-		int numPages = increment / PAGE_SIZE;
 
-		if(increment % PAGE_SIZE == 0)
-			kbreak += (numPages * PAGE_SIZE);
-		else
-			kbreak = kbreak + ((numPages + 1) * PAGE_SIZE);
+		uint32 iteration = increment/PAGE_SIZE;
+		int mappingDone = 0;
 
-		uint32 *ptr_page_table = NULL;
-		int ret = get_page_table(ptr_page_directory, exStart, &ptr_page_table);
-		if(ret == TABLE_IN_MEMORY)
+		if(increment%PAGE_SIZE != 0)
 		{
-			struct FrameInfo *ptr_frame_info;
-			int fret = allocate_frame(&ptr_frame_info);
-			if(fret == 0)
+			iteration++;
+		}
+
+		uint32 pagePtr = kbreak;
+
+		for(int i = 0;i<iteration;i++)
+		{
+			int numPages = increment / PAGE_SIZE;
+
+			if(increment % PAGE_SIZE == 0)
+				kbreak += (numPages * PAGE_SIZE);
+			else
+				kbreak = kbreak + ((numPages + 1) * PAGE_SIZE);
+
+			uint32 *ptr_page_table = NULL;
+			int ret = get_page_table(ptr_page_directory, pagePtr, &ptr_page_table);
+			if(ret == TABLE_IN_MEMORY)
 			{
-				int mret = map_frame(ptr_page_directory, ptr_frame_info, exStart, PERM_WRITEABLE);
-				if(mret == 0)
+				struct FrameInfo *ptr_frame_info;
+				int fret = allocate_frame(&ptr_frame_info);
+				if(fret == 0)
 				{
-					//check
-					return (void*)exStart;
+					int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
+					if(mret == 0)
+					{
+						mappingDone = 1;
+					}else
+					{
+						mappingDone = 0;
+						break;
+					}
+				}
+
+			}else
+			{
+				ptr_page_table = create_page_table(ptr_page_directory, pagePtr);
+				struct FrameInfo *ptr_frame_info;
+				int fret = allocate_frame(&ptr_frame_info);
+				if(fret == 0)
+				{
+					int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
+					if(mret == 0)
+					{
+						mappingDone = 1;
+					}else
+					{
+						mappingDone = 0;
+						break;
+					}
 				}
 			}
-
-		}else
-		{
-			ptr_page_table = create_page_table(ptr_page_directory, exStart);
-			struct FrameInfo *ptr_frame_info;
-			int fret = allocate_frame(&ptr_frame_info);
-			if(fret == 0)
-			{
-				int mret = map_frame(ptr_page_directory, ptr_frame_info, exStart, PERM_WRITEABLE);
-				if(mret == 0)
-				{
-					//
-					return (void*)exStart;
-				}
-			}
+			pagePtr += PAGE_SIZE;
+		}
+		if(mappingDone){
+			initialize_dynamic_allocator(kbreak, pagePtr);
+			return (void*)kbreak;
 		}
 	}
 
 	if(increment < 0)
 	{
-
+		uint32 pagePtr = kbreak;
 		int numPages = (increment / PAGE_SIZE);
 		if(increment % PAGE_SIZE != 0)
 			numPages++;
 		kbreak = kbreak - (numPages * PAGE_SIZE);
-		unmap_frame(ptr_page_directory, kbreak);
-		return (void *)kbreak;
+		for(int i = 0;i<numPages;i++)
+		{
+			unmap_frame(ptr_page_directory, pagePtr);
+			pagePtr -= PAGE_SIZE;
+		}
+
+		return (void *)pagePtr;
 	}
 
 	panic("negawatt");
