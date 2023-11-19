@@ -236,12 +236,12 @@ void* sbrk(int increment)
 		for(int i = 0;i<numPages;i++)
 		{
 			unmap_frame(ptr_page_directory, pagePtr);
-			free_frame(ptr_frame_info);
 
 		//-------------------------------------------------------------------------//
 			ptr_page_table = NULL;
 			ptr_frame_info = get_frame_info(ptr_page_directory, pagePtr, &ptr_page_table);
-
+			free_frame(ptr_frame_info);
+			
 			if((struct BlockMetaData *) pagePtr == LIST_LAST(&BlockList))
 				LIST_REMOVE(&BlockList,LIST_LAST(&BlockList));
 		//-------------------------------------------------------------------------//
