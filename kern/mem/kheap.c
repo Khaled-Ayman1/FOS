@@ -30,18 +30,19 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 	//flawed equation, broken when % is equal 0 (fix asap)
 
 	uint32 brkRoundUp = PAGE_SIZE - (initSizeToAllocate % PAGE_SIZE);
-	uint32 khlRoundUp = PAGE_SIZE - (daLimit % PAGE_SIZE);
 
-	kbreak = initSizeToAllocate + brkRoundUp;
-	khl = daLimit + khlRoundUp;
-
+	if(brkRoundUp == PAGE_SIZE){
+		kbreak = initSizeToAllocate;
+	}else{
+		kbreak = initSizeToAllocate + brkRoundUp;
+	}
 	uint32 iteration = kbreak / PAGE_SIZE;
 
 	//-------------TEST----------------//
 
 	kstart = daStart;
 	//kbreak = initSizeToAllocate;
-	//khl = daLimit;
+	khl = daLimit;
 	//uint32 iteration = initSizeToAllocate/PAGE_SIZE;
 	int mappingDone = 0;
 
@@ -51,6 +52,10 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 	}*/
 
 	uint32 pagePtr = kstart;
+
+	cprintf("\n");
+	cprintf("inside init");
+	cprintf("\n");
 
 	for(int i = 0;i<iteration;i++)
 	{
@@ -64,6 +69,7 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 
 			if(fret == 0)
 			{
+
 				int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
 				if(mret == 0)
 				{
@@ -75,25 +81,6 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 				}
 			}
 
-		}else
-		{
-			ptr_page_table = create_page_table(ptr_page_directory, pagePtr);
-			struct FrameInfo *ptr_frame_info;
-
-			int fret = allocate_frame(&ptr_frame_info);
-
-			if(fret == 0)
-			{
-				int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
-				if(mret == 0)
-				{
-					mappingDone = 1;
-				}else
-				{
-					mappingDone = 0;
-					break;
-				}
-			}
 		}
 
 		pagePtr += PAGE_SIZE;
@@ -111,150 +98,66 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 
 void* sbrk(int increment)
 {
-	//TODO: [PROJECT'23.MS2 - #02] [1] KERNEL HEAP - sbrk()
-	/* increment > 0: move the segment break of the kernel to increase the size of its heap,
-	 * 				you should allocate pages and map them into the kernel virtual address space as necessary,
-	 * 				and returns the address of the previous break (i.e. the beginning of newly mapped memory).
-	 * increment = 0: just return the current position of the segment break
-	 * increment < 0: move the segment break of the kernel to decrease the size of its heap,
-	 * 				you should deallocate pages that no longer contain part of the heap as necessary.
-	 * 				and returns the address of the new break (i.e. the end of the current heap space).
-	 *
-	 * NOTES:
-	 * 	1) You should only have to allocate or deallocate pages if the segment break crosses a page boundary
-	 * 	2) New segment break should be aligned on page-boundary to avoid "No Man's Land" problem
-	 * 	3) Allocating additional pages for a kernel dynamic allocator will fail if the free frames are exhausted
-	 * 		or the break exceed the limit of the dynamic allocator. If sbrk fails, kernel should panic(...)
-	 */
 
-	//MS2: COMMENT THIS LINE BEFORE START CODING====
-	//return (void*)-1 ;
-	//panic("not implemented yet");
+	cprintf("\n");
+	cprintf("inside sbrk");
+	cprintf("\n");
 
 	if (increment == 0)
 		return (void*)kbreak;
 
-	//-------------TEST----------------//
-
-	uint32 roundUp = PAGE_SIZE - (increment % PAGE_SIZE);
-	increment += roundUp;
-
-	//-------------TEST----------------//
-
-	uint32 exStart = kbreak;
 
 	if(increment > 0 && increment + kbreak < khl)
 	{
 
-		uint32 iteration = increment/PAGE_SIZE;
-		int mappingDone = 0;
+		uint32 exStart = kbreak;
+		kbreak += PAGE_SIZE;
+		uint32* ptr_page_table = NULL;
+		int ret = get_page_table(ptr_page_directory, exStart, &ptr_page_table);
 
-		/*if(increment%PAGE_SIZE != 0)
+		if(ret == TABLE_IN_MEMORY)
 		{
-			iteration++;
-		}*/
+			struct FrameInfo *ptr_frame_info;
+			int fret = allocate_frame(&ptr_frame_info);
 
-		uint32 pagePtr = kbreak;
-
-		for(int i = 0;i<iteration;i++)
-		{
-
-			//-----------------------------------------------------//
-
-			//iteration already == numPages
-			/*int numPages = increment / PAGE_SIZE;*/
-
-			//redundant condition (increment already page aligned)
-			/*if(increment % PAGE_SIZE == 0)
-				kbreak += (numPages * PAGE_SIZE);
-			else
-				kbreak = kbreak + ((numPages + 1) * PAGE_SIZE);*/
-
-			//instead
-			kbreak += (iteration * PAGE_SIZE);
-
-			//------------------------------------------------------//
-
-			uint32 *ptr_page_table = NULL;
-			int ret = get_page_table(ptr_page_directory, pagePtr, &ptr_page_table);
-			if(ret == TABLE_IN_MEMORY)
+			if(fret == 0)
 			{
-				struct FrameInfo *ptr_frame_info;
-				int fret = allocate_frame(&ptr_frame_info);
-				if(fret == 0)
+				int mret = map_frame(ptr_page_directory, ptr_frame_info, exStart, PERM_WRITEABLE);
+				if(mret == 0)
 				{
-					int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
-					if(mret == 0)
-					{
-						mappingDone = 1;
-					}else
-					{
-						mappingDone = 0;
-						break;
-					}
-				}
-
-			}else
-			{
-				ptr_page_table = create_page_table(ptr_page_directory, pagePtr);
-				struct FrameInfo *ptr_frame_info;
-				int fret = allocate_frame(&ptr_frame_info);
-				if(fret == 0)
-				{
-					int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
-					if(mret == 0)
-					{
-						mappingDone = 1;
-					}else
-					{
-						mappingDone = 0;
-						break;
-					}
+					return (void*)exStart;
 				}
 			}
-			pagePtr += PAGE_SIZE;
-		}
-		if(mappingDone){
-			initialize_dynamic_allocator(kbreak, pagePtr);
-			return (void*)kbreak;
 		}
 	}
 
 	if(increment < 0)
 	{
-		uint32 pagePtr = kbreak;
-		int numPages = (increment / PAGE_SIZE);
-		struct FrameInfo *ptr_frame_info;
-		uint32 *ptr_page_table;
+		uint32 exStart = kbreak;
+		kbreak -= increment;
 
-		//--------------------------------------//
-		/*if(increment % PAGE_SIZE != 0)
-			numPages++;*/
-		//-------------------------------------//
-
-		kbreak = kbreak - (numPages * PAGE_SIZE);
-		for(int i = 0;i<numPages;i++)
+		int numOfPages = (increment/PAGE_SIZE)* (-1);
+		if(increment%PAGE_SIZE != 0)
+			numOfPages++;
+		for(int i = 0;i<numOfPages;i++)
 		{
-			unmap_frame(ptr_page_directory, pagePtr);
-
-		//-------------------------------------------------------------------------//
-			ptr_page_table = NULL;
-			ptr_frame_info = get_frame_info(ptr_page_directory, pagePtr, &ptr_page_table);
+			uint32* ptr_page_table = NULL;
+			int ret = get_page_table(ptr_page_directory, exStart, &ptr_page_table);
+			struct FrameInfo *ptr_frame_info;
+			ptr_frame_info = get_frame_info(ptr_page_directory,exStart,&ptr_page_table);
+			unmap_frame(ptr_page_directory,exStart);
 			free_frame(ptr_frame_info);
-			
-			if((struct BlockMetaData *) pagePtr == LIST_LAST(&BlockList))
-				LIST_REMOVE(&BlockList,LIST_LAST(&BlockList));
-		//-------------------------------------------------------------------------//
 
-			pagePtr -= PAGE_SIZE;
+			exStart -= PAGE_SIZE;
 		}
-
-		return (void *)pagePtr;
+		return (void*)kbreak;
 	}
 
-	panic("Limit Reached");
+	panic("negawatt");
 	return (void*)-1;
 }
+
+
 
 
 void* kmalloc(unsigned int size)
@@ -265,64 +168,61 @@ void* kmalloc(unsigned int size)
 
 	//change this "return" according to your answer
 
+	cprintf("\n");
+	cprintf("inside Kmalloc");
+	cprintf("\n");
+
 	if(size <= 0 || size > DYN_ALLOC_MAX_SIZE)
 		return NULL;
 
 	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE)
 		return alloc_block_FF(size);
 
-	struct FrameInfo *ptr_frame_info;
-	uint32 *ptr_page_table = NULL;
-	uint32 pagePtr = khl + PAGE_SIZE;
 
+	uint32 pagePtr = khl + PAGE_SIZE;
+	uint32 startPage,endPage;
+	startPage = endPage = pagePtr;
+	int remainingSize = size;
+	int numOfPages = 0;
 
 	if(isKHeapPlacementStrategyFIRSTFIT()){
 
-		 uint32 startPage, endPage;
-		 startPage = endPage = pagePtr;
-		 unsigned int remainSize = size;
-		 int ret;
+		while(remainingSize > 0)
+		{
+			uint32* ptr_page_table = NULL;
+			int ret = get_page_table(ptr_page_directory, pagePtr, &ptr_page_table);
 
-		 while(remainSize > 0){
+			if(ret == TABLE_IN_MEMORY)
+			{
+				struct FrameInfo *ptr_frame_info;
+				ptr_frame_info = get_frame_info(ptr_page_directory, pagePtr, &ptr_page_table);
+				pagePtr += PAGE_SIZE;
+				if(ptr_frame_info == 0){
+					endPage = pagePtr - PAGE_SIZE;
+					remainingSize -= PAGE_SIZE;
+					numOfPages++;
+				}else
+				{
+					startPage = endPage = pagePtr;
+					remainingSize = size;
+					numOfPages = 0;
+				}
 
-			 ret = get_page_table(ptr_page_directory, pagePtr, &ptr_page_table);
+			}
+		}
+		uint32 iPage = startPage;
+		for(int i = 0;i<numOfPages;i++)
+		{
+			struct FrameInfo *ptr_frame_info;
+			int fret = allocate_frame(&ptr_frame_info);
+			if(fret == 0)
+			{
+				int mret = map_frame(ptr_page_directory, ptr_frame_info, iPage, PERM_WRITEABLE);
+				iPage+= PAGE_SIZE;
+			}
+		}
+		return (void*)startPage;
 
-			 if (ret == TABLE_NOT_EXIST){
-
-				 ptr_page_table = create_page_table(ptr_page_directory, endPage);
-				 pagePtr += PAGE_SIZE;
-				 startPage = endPage = pagePtr;
-				 remainSize = size;
-
-				 continue;
-			 }
-
-		 	 ptr_frame_info = get_frame_info(ptr_page_directory, pagePtr, &ptr_page_table);
-		 	 pagePtr += PAGE_SIZE;
-
-		 	 if(ptr_frame_info == 0){
-
-		 	 	 remainSize -= PAGE_SIZE;
-		 	 	 endPage = pagePtr - PAGE_SIZE;
-		 	 }
-		 	 else{
-
-		 	 	 startPage = endPage = pagePtr;
-		 	 	 remainSize = size;
-		 	 }
-		 }
-
-		 for(uint32 startPtr = startPage; startPtr == endPage; startPtr += PAGE_SIZE){
-			 ptr_frame_info = NULL;
-			 allocate_frame(&ptr_frame_info);
-
-			 int mret = map_frame(ptr_page_directory, ptr_frame_info, startPtr, PERM_WRITEABLE);
-
-			 if(mret != 0)
-   			 	 panic("\nMap unsuccessful @ va: %x\n", pagePtr);
-		 }
-
-		 return (void *) startPage;
 	}
 
 
@@ -332,7 +232,9 @@ void* kmalloc(unsigned int size)
 		//BONUS
 
 	}
-
+	cprintf("\n");
+	cprintf("negawatt");
+	cprintf("\n");
 
 	//kpanic_into_prompt("kmalloc() is not implemented yet...!!");
 	return NULL;
@@ -375,50 +277,50 @@ unsigned int kheap_virtual_address(unsigned int physical_address)
 unsigned int kheap_physical_address(unsigned int virtual_address){
 
 	//TODO: [PROJECT'23.MS2 - #06] [1] KERNEL HEAP - kheap_physical_address()
-	//refer to the project presentation and documentation for details
-	// Write your code here, remove the panic and write your code
-	//panic("kheap_physical_address() is not implemented yet...!!");
+		//refer to the project presentation and documentation for details
+		// Write your code here, remove the panic and write your code
+		//panic("kheap_physical_address() is not implemented yet...!!");
+		// Assuming you have a valid page directory and page table structure set up
 
 
-	// Assuming you have a valid page directory and page table structure set up
+		  uint32 pdx = PDX(virtual_address);
+		    uint32 ptx = PTX(virtual_address);
 
-	uint32 pdx = PDX(virtual_address); //page directory index
-	uint32 ptx = PTX(virtual_address); //page table index
+		    // Retrieve the page directory entry
+		    uint32 page_directory_entry = ptr_page_directory[pdx];
 
-	// Retrieve the page directory entry
-	uint32 page_directory_entry = ptr_page_directory[pdx];
+		    // Check if the page directory entry is present
+		    if ((page_directory_entry & PERM_PRESENT) != PERM_PRESENT) {
+		        // No mapping, return 0
+		        return 0;
+		    }
 
-	// Check if the page directory entry is present
-	if ((page_directory_entry & PERM_PRESENT) != PERM_PRESENT) {
-		// No mapping, return 0
-		return 0;
-	}
+		    // Get the frame number of the page table from the page directory entry
+		    uint32 frameOfPageTable = EXTRACT_ADDRESS(page_directory_entry);
 
-	// Get the address of the page table from the page directory entry
-	uint32 frameOfPageTable = EXTRACT_ADDRESS(page_directory_entry);
+		    // Calculate the address of the page table
 
-	// Calculate the address of the page table
-	uint32 *ptr_page_table = (uint32 *) frameOfPageTable;
 
-	//STATIC_KERNEL_VIRTUAL_ADDRESS(frameOfPageTable);
+		    // Retrieve the page table entry
+		    //uint32 *ptr_page_table=STATIC_KERNEL_VIRTUAL_ADDRESS(frameOfPageTable);
+		    uint32 *ptr_page_table = (uint32 *) frameOfPageTable;
+		    uint32 page_table_entry=ptr_page_table[ptx];
 
-	// Retrieve the page table entry
-	uint32 page_table_entry = ptr_page_table[ptx];
+		    // Check if the page table entry is present
+		    if ((page_table_entry & PERM_PRESENT) != PERM_PRESENT) {
+		        // No mapping, return 0
+		        return 0;
+		    }
 
-	// Check if the page table entry is present
-	if ((page_table_entry & PERM_PRESENT) != PERM_PRESENT) {
-		// No mapping, return 0
-		return 0;
-	}
+		    // Calculate the physical address using the page frame and offset
+		    uint32 frameOfPage = EXTRACT_ADDRESS(page_table_entry);
+		    //uint32 offset = (virtual_address >> 11) & 0xFFF; // calculate offset
+		    uint32 offset = virtual_address %PAGE_SIZE;
 
-	// Calculate the physical address using the page frame and offset
-	uint32 frameOfPage = EXTRACT_ADDRESS(page_table_entry);
-	uint32 offset = virtual_address %PAGE_SIZE; // calculate offset
+		    // Calculate physical address by combining the frame number and offset
+		    uint32 physical_address = (frameOfPage * PAGE_SIZE) + offset;
 
-	// Calculate physical address by combining the frame number and offset
-	uint32 physical_address = (frameOfPage * PAGE_SIZE) + offset;
-
-	return physical_address;
+		    return physical_address;
 }
 
 

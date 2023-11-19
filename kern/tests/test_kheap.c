@@ -102,7 +102,14 @@ int test_kmalloc()
 		freeDiskFrames = pf_calculate_free_frames() ;
 		ptr_allocations[2] = kmalloc(2*kilo-1);
 		if ((uint32) ptr_allocations[2] < KERNEL_HEAP_START || ptr_allocations[2] >= sbrk(0) || (uint32) ptr_allocations[2] >= da_limit)
-			{ correct = 0; cprintf("Wrong start address for the allocated space... should allocated by the dynamic allocator! check return address of kmalloc and/or sbrk\n"); }
+			{ correct = 0; cprintf("Wrong start address for the allocated space... should allocated by the dynamic allocator! check return address of kmalloc and/or sbrk\n");
+			cprintf("\n");
+							cprintf("alloc add= %x",ptr_allocations[3]);
+							cprintf("\n");
+							cprintf("\n");
+							cprintf("sbrk add= %x",sbrk(0));
+							cprintf("\n");
+			}
 		if ((pf_calculate_free_frames() - freeDiskFrames) != 0) { correct = 0; cprintf("Page file is changed while it's not expected to. (pages are wrongly allocated/de-allocated in PageFile)\n"); }
 		//if ((freeFrames - sys_calculate_free_frames()) != 1) { correct = 0; cprintf("Wrong allocation: pages are not loaded successfully into memory\n"); }
 
@@ -111,7 +118,14 @@ int test_kmalloc()
 		freeDiskFrames = pf_calculate_free_frames() ;
 		ptr_allocations[3] = kmalloc(2*kilo-1);
 		if ((uint32) ptr_allocations[3] < KERNEL_HEAP_START || ptr_allocations[3] >= sbrk(0) || (uint32) ptr_allocations[3] >= da_limit)
-			{ correct = 0; cprintf("Wrong start address for the allocated space... should allocated by the dynamic allocator! check return address of kmalloc and/or sbrk\n"); }
+			{ correct = 0; cprintf("Wrong start address for the allocated space... should allocated by the dynamic allocator! check return address of kmalloc and/or sbrk\n");
+				cprintf("\n");
+				cprintf("alloc add= %x",ptr_allocations[3]);
+				cprintf("\n");
+				cprintf("\n");
+				cprintf("sbrk add= %x",sbrk(0));
+				cprintf("\n");
+			}
 		if ((pf_calculate_free_frames() - freeDiskFrames) != 0) { correct = 0; cprintf("Page file is changed while it's not expected to. (pages are wrongly allocated/de-allocated in PageFile)\n"); }
 		//if ((freeFrames - sys_calculate_free_frames()) != 1) panic("Wrong allocation: pages are not loaded successfully into memory\n"); }
 

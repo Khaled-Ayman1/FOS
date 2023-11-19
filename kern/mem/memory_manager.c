@@ -273,7 +273,13 @@ void * create_page_table(uint32 *ptr_directory, const uint32 virtual_address)
 	//change this "return" according to your answer
 
 #if USE_KHEAP
+	cprintf("\n");
+		cprintf("here -1");
+		cprintf("\n");
 	uint32 * ptr_page_table = kmalloc(PAGE_SIZE);
+	cprintf("\n");
+		cprintf("here 0");
+		cprintf("\n");
 	if(ptr_page_table == NULL)
 	{
 		panic("NOT ENOUGH KERNEL HEAP SPACE");
@@ -281,14 +287,24 @@ void * create_page_table(uint32 *ptr_directory, const uint32 virtual_address)
 	ptr_directory[PDX(virtual_address)] = CONSTRUCT_ENTRY(
 			kheap_physical_address((unsigned int)ptr_page_table)
 			, PERM_PRESENT | PERM_USER | PERM_WRITEABLE);
-
+	cprintf("\n");
+		cprintf("here 0.5");
+		cprintf("\n");
 	//================
 	memset(ptr_page_table , 0, PAGE_SIZE);
 	tlbflush();
-
+	cprintf("\n");
+	cprintf("here 1");
+	cprintf("\n");
 #else
+	cprintf("\n");
+		cprintf("here 2");
+		cprintf("\n");
 	uint32 * ptr_page_table ;
 	__static_cpt(ptr_directory, virtual_address, &ptr_page_table) ;
+	cprintf("\n");
+		cprintf("here 3");
+		cprintf("\n");
 #endif
 
 	return ptr_page_table;
