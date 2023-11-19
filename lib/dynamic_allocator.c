@@ -112,10 +112,6 @@ void *alloc_block_FF(uint32 size)
 {
 	//TODO: [PROJECT'23.MS1 - #6] [3] DYNAMIC ALLOCATOR - alloc_block_FF()
 
-	cprintf("\n");
-	cprintf("inside allocFF");
-	cprintf("\n");
-
 	if(size <= 0)
 		return NULL;
 
@@ -166,21 +162,21 @@ void *alloc_block_FF(uint32 size)
 		}
 	}
 
+
 	heapLimit = sbrk(0);
 
 	if((uint32)heapLimit == ((uint32)exStart + exStart->size)){
 
 		if(exStart->is_free == 0){
 
-			//sbrk() calls multiple of pages, the following block handles free unused space
-
-			uint32 exPages = allocatedSize / PAGE_SIZE; //Pages to be allocated
+			//Pages to be allocated
+			uint32 exPages = allocatedSize / PAGE_SIZE;
 
 			if (allocatedSize % PAGE_SIZE != 0)
 				exPages++;
 
-			uint32 exSize = exPages * PAGE_SIZE;  //Total size >= allocatedSize
-
+			//Total size >= allocatedSize
+			uint32 exSize = exPages * PAGE_SIZE;
 			heapLimit = sbrk(allocatedSize);
 
 			if(heapLimit == (void *)-1)
@@ -192,8 +188,6 @@ void *alloc_block_FF(uint32 size)
 
 			LIST_INSERT_AFTER(&BlockList, exStart, allocated);
 
-			//In case LIST_INSERT_AFTER fails uncomment the following:
-			//LIST_INSERT_TAIL(&BlockList, allocated);
 
 			if(exSize > allocatedSize){
 
@@ -207,21 +201,25 @@ void *alloc_block_FF(uint32 size)
 					newBlock->size = exSize - allocatedSize;
 					newBlock->is_free = 1;
 
-					//In case LIST_INSERT_AFTER fails use Insert tail
 					LIST_INSERT_AFTER(&BlockList, allocated, newBlock);
 				}
 			}
 
 			return ((void *) allocated + sizeOfMetaData());
+
 		}
 
-		uint32 exAlloc = allocatedSize - (exStart->size); //allocated part of expansion
-		uint32 exPages = exAlloc / PAGE_SIZE; //Pages to be allocated
+		//allocated part of expansion
+		uint32 exAlloc = allocatedSize - (exStart->size);
+
+		//Pages to be allocated
+		uint32 exPages = exAlloc / PAGE_SIZE;
 
 		if (exAlloc % PAGE_SIZE != 0)
 			exPages++;
 
-		uint32 exSize = exPages * PAGE_SIZE;  //Total size >= (exAlloc)
+		//Total size >= exAlloc
+		uint32 exSize = exPages * PAGE_SIZE;
 
 		heapLimit = sbrk(exAlloc);
 
@@ -244,7 +242,6 @@ void *alloc_block_FF(uint32 size)
 				newBlock->size = exSize - exAlloc;
 				newBlock->is_free = 1;
 
-				//In case LIST_INSERT_TAIL fails use Insert After
 				LIST_INSERT_AFTER(&BlockList, allocated, newBlock);
 			}
 		}
@@ -323,12 +320,14 @@ void *alloc_block_BF(uint32 size)
 
 	else{
 
-		uint32 exPages = allocatedSize / PAGE_SIZE; //Pages to be allocated
+		//Pages to be allocated
+		uint32 exPages = allocatedSize / PAGE_SIZE;
 
 		if (allocatedSize % PAGE_SIZE != 0)
 			exPages++;
 
-		uint32 exSize = exPages * PAGE_SIZE;  //Total size >= allocatedSize
+		//Total size >= allocatedSize
+		uint32 exSize = exPages * PAGE_SIZE;
 
 		heapLimit = sbrk(allocatedSize);
 
@@ -342,9 +341,6 @@ void *alloc_block_BF(uint32 size)
 
 		LIST_INSERT_AFTER(&BlockList, exStart, allocated);
 
-		//In case LIST_INSERT_AFTER fails uncomment the following:
-		//LIST_INSERT_TAIL(&BlockList, allocated);
-
 		if(exSize > allocatedSize){
 
 			if((exSize - allocatedSize) < sizeOfMetaData())
@@ -357,7 +353,6 @@ void *alloc_block_BF(uint32 size)
 				newBlock->size = exSize - allocatedSize;
 				newBlock->is_free = 1;
 
-				//In case LIST_INSERT_AFTER fails use Insert tail
 				LIST_INSERT_AFTER(&BlockList, allocated, newBlock);
 			}
 		}
