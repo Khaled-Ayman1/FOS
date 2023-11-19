@@ -23,16 +23,32 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 		return E_NO_MEM;
 	}
 
+	//-------------TEST----------------//
+
+	//Page Aligning brk and rlimit
+
+	//flawed equation, broken when % is equal 0 (fix asap)
+
+	uint32 brkRoundUp = PAGE_SIZE - (initSizeToAllocate % PAGE_SIZE);
+	uint32 khlRoundUp = PAGE_SIZE - (daLimit % PAGE_SIZE);
+
+	kbreak = initSizeToAllocate + brkRoundUp;
+	khl = daLimit + khlRoundUp;
+
+	uint32 iteration = kbreak / PAGE_SIZE;
+
+	//-------------TEST----------------//
+
 	kstart = daStart;
-	kbreak = initSizeToAllocate;
-	khl = daLimit;
-	uint32 iteration = initSizeToAllocate/PAGE_SIZE;
+	//kbreak = initSizeToAllocate;
+	//khl = daLimit;
+	//uint32 iteration = initSizeToAllocate/PAGE_SIZE;
 	int mappingDone = 0;
 
-	if(initSizeToAllocate%PAGE_SIZE != 0)
+	/*if(initSizeToAllocate%PAGE_SIZE != 0)
 	{
 		iteration++;
-	}
+	}*/
 
 	uint32 pagePtr = kstart;
 
@@ -118,6 +134,13 @@ void* sbrk(int increment)
 	if (increment == 0)
 		return (void*)kbreak;
 
+	//-------------TEST----------------//
+
+	uint32 roundUp = PAGE_SIZE - (increment % PAGE_SIZE);
+	increment += roundUp;
+
+	//-------------TEST----------------//
+
 	uint32 exStart = kbreak;
 
 	if(increment > 0 && increment + kbreak < khl)
@@ -126,21 +149,31 @@ void* sbrk(int increment)
 		uint32 iteration = increment/PAGE_SIZE;
 		int mappingDone = 0;
 
-		if(increment%PAGE_SIZE != 0)
+		/*if(increment%PAGE_SIZE != 0)
 		{
 			iteration++;
-		}
+		}*/
 
 		uint32 pagePtr = kbreak;
 
 		for(int i = 0;i<iteration;i++)
 		{
-			int numPages = increment / PAGE_SIZE;
 
-			if(increment % PAGE_SIZE == 0)
+			//-----------------------------------------------------//
+
+			//iteration already == numPages
+			/*int numPages = increment / PAGE_SIZE;*/
+
+			//redundant condition (increment already page aligned)
+			/*if(increment % PAGE_SIZE == 0)
 				kbreak += (numPages * PAGE_SIZE);
 			else
-				kbreak = kbreak + ((numPages + 1) * PAGE_SIZE);
+				kbreak = kbreak + ((numPages + 1) * PAGE_SIZE);*/
+
+			//instead
+			kbreak += (iteration * PAGE_SIZE);
+
+			//------------------------------------------------------//
 
 			uint32 *ptr_page_table = NULL;
 			int ret = get_page_table(ptr_page_directory, pagePtr, &ptr_page_table);
@@ -191,19 +224,35 @@ void* sbrk(int increment)
 	{
 		uint32 pagePtr = kbreak;
 		int numPages = (increment / PAGE_SIZE);
-		if(increment % PAGE_SIZE != 0)
-			numPages++;
+		struct FrameInfo *ptr_frame_info;
+		uint32 *ptr_page_table;
+
+		//--------------------------------------//
+		/*if(increment % PAGE_SIZE != 0)
+			numPages++;*/
+		//-------------------------------------//
+
 		kbreak = kbreak - (numPages * PAGE_SIZE);
 		for(int i = 0;i<numPages;i++)
 		{
 			unmap_frame(ptr_page_directory, pagePtr);
+			free_frame(ptr_frame_info);
+
+		//-------------------------------------------------------------------------//
+			ptr_page_table = NULL;
+			ptr_frame_info = get_frame_info(ptr_page_directory, pagePtr, &ptr_page_table);
+
+			if((struct BlockMetaData *) pagePtr == LIST_LAST(&BlockList))
+				LIST_REMOVE(&BlockList,LIST_LAST(&BlockList));
+		//-------------------------------------------------------------------------//
+
 			pagePtr -= PAGE_SIZE;
 		}
 
 		return (void *)pagePtr;
 	}
 
-	panic("negawatt");
+	panic("Limit Reached");
 	return (void*)-1;
 }
 
@@ -216,18 +265,64 @@ void* kmalloc(unsigned int size)
 
 	//change this "return" according to your answer
 
-	if(size <= 0)
+	if(size <= 0 || size > DYN_ALLOC_MAX_SIZE)
 		return NULL;
 
+	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE)
+		return alloc_block_FF(size);
+
 	struct FrameInfo *ptr_frame_info;
+	uint32 *ptr_page_table = NULL;
+	uint32 pagePtr = khl + PAGE_SIZE;
+
 
 	if(isKHeapPlacementStrategyFIRSTFIT()){
 
-		if(size <= DYN_ALLOC_MAX_BLOCK_SIZE)
-			return alloc_block_FF(size);
+		 uint32 startPage, endPage;
+		 startPage = endPage = pagePtr;
+		 unsigned int remainSize = size;
+		 int ret;
 
+		 while(remainSize > 0){
 
-		return NULL;
+			 ret = get_page_table(ptr_page_directory, pagePtr, &ptr_page_table);
+
+			 if (ret == TABLE_NOT_EXIST){
+
+				 ptr_page_table = create_page_table(ptr_page_directory, endPage);
+				 pagePtr += PAGE_SIZE;
+				 startPage = endPage = pagePtr;
+				 remainSize = size;
+
+				 continue;
+			 }
+
+		 	 ptr_frame_info = get_frame_info(ptr_page_directory, pagePtr, &ptr_page_table);
+		 	 pagePtr += PAGE_SIZE;
+
+		 	 if(ptr_frame_info == 0){
+
+		 	 	 remainSize -= PAGE_SIZE;
+		 	 	 endPage = pagePtr - PAGE_SIZE;
+		 	 }
+		 	 else{
+
+		 	 	 startPage = endPage = pagePtr;
+		 	 	 remainSize = size;
+		 	 }
+		 }
+
+		 for(uint32 startPtr = startPage; startPtr == endPage; startPtr += PAGE_SIZE){
+			 ptr_frame_info = NULL;
+			 allocate_frame(&ptr_frame_info);
+
+			 int mret = map_frame(ptr_page_directory, ptr_frame_info, startPtr, PERM_WRITEABLE);
+
+			 if(mret != 0)
+   			 	 panic("\nMap unsuccessful @ va: %x\n", pagePtr);
+		 }
+
+		 return (void *) startPage;
 	}
 
 
@@ -256,23 +351,74 @@ unsigned int kheap_virtual_address(unsigned int physical_address)
 	//TODO: [PROJECT'23.MS2 - #05] [1] KERNEL HEAP - kheap_virtual_address()
 	//refer to the project presentation and documentation for details
 	// Write your code here, remove the panic and write your code
-	panic("kheap_virtual_address() is not implemented yet...!!");
+	//panic("kheap_virtual_address() is not implemented yet...!!");
+
+      struct FrameInfo * ptr ;
+	  ptr= to_frame_info(physical_address);
+	  if (ptr == NULL)
+	  {
+	     return 0;
+	  }
+
+	  return ptr->va;
+
+
 
 	//EFFICIENT IMPLEMENTATION ~O(1) IS REQUIRED ==================
 
+
 	//change this "return" according to your answer
-	return 0;
+	//return 0;
 }
 
-unsigned int kheap_physical_address(unsigned int virtual_address)
-{
+
+unsigned int kheap_physical_address(unsigned int virtual_address){
+
 	//TODO: [PROJECT'23.MS2 - #06] [1] KERNEL HEAP - kheap_physical_address()
 	//refer to the project presentation and documentation for details
 	// Write your code here, remove the panic and write your code
-	panic("kheap_physical_address() is not implemented yet...!!");
+	//panic("kheap_physical_address() is not implemented yet...!!");
 
-	//change this "return" according to your answer
-	return 0;
+
+	// Assuming you have a valid page directory and page table structure set up
+
+	uint32 pdx = PDX(virtual_address); //page directory index
+	uint32 ptx = PTX(virtual_address); //page table index
+
+	// Retrieve the page directory entry
+	uint32 page_directory_entry = ptr_page_directory[pdx];
+
+	// Check if the page directory entry is present
+	if ((page_directory_entry & PERM_PRESENT) != PERM_PRESENT) {
+		// No mapping, return 0
+		return 0;
+	}
+
+	// Get the address of the page table from the page directory entry
+	uint32 frameOfPageTable = EXTRACT_ADDRESS(page_directory_entry);
+
+	// Calculate the address of the page table
+	uint32 *ptr_page_table = (uint32 *) frameOfPageTable;
+
+	//STATIC_KERNEL_VIRTUAL_ADDRESS(frameOfPageTable);
+
+	// Retrieve the page table entry
+	uint32 page_table_entry = ptr_page_table[ptx];
+
+	// Check if the page table entry is present
+	if ((page_table_entry & PERM_PRESENT) != PERM_PRESENT) {
+		// No mapping, return 0
+		return 0;
+	}
+
+	// Calculate the physical address using the page frame and offset
+	uint32 frameOfPage = EXTRACT_ADDRESS(page_table_entry);
+	uint32 offset = virtual_address %PAGE_SIZE; // calculate offset
+
+	// Calculate physical address by combining the frame number and offset
+	uint32 physical_address = (frameOfPage * PAGE_SIZE) + offset;
+
+	return physical_address;
 }
 
 
