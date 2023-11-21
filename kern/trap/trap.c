@@ -378,6 +378,25 @@ void fault_handler(struct Trapframe *tf)
 			//TODO: [PROJECT'23.MS2 - #13] [3] PAGE FAULT HANDLER - Check for invalid pointers
 			//(e.g. pointing to unmarked user heap page, kernel or wrong access rights),
 			//your code is here
+			uint32 perms = pt_get_page_permissions(faulted_env->env_page_directory, fault_va);
+
+						if (fault_va<=USER_LIMIT)
+						{
+						 sched_kill_env(faulted_env->env_id);
+					    }
+
+						if ( perms & PERM_WRITEABLE)
+						{
+						 sched_kill_env(faulted_env->env_id);
+
+						}
+
+						return ;
+
+
+
+
+
 
 			/*============================================================================================*/
 		}
