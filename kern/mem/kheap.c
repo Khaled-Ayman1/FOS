@@ -483,6 +483,7 @@ void *krealloc(void *virtual_address, uint32 new_size)
 	}
 
 
-	return NULL;
+	return virtual_address;
+
 	//panic("krealloc() is not implemented yet...!!");
 }
