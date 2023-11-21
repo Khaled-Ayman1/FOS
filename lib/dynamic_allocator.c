@@ -118,7 +118,6 @@ void *alloc_block_FF(uint32 size)
 	if(!is_initialized)
 	{
 		uint32 required_size = size +sizeOfMetaData();
-		cprintf("\nsbrk A, %d\n", required_size);
 		uint32 da_start = (uint32)sbrk(required_size);
 
 		uint32 da_break = (uint32)sbrk(0);
@@ -132,18 +131,8 @@ void *alloc_block_FF(uint32 size)
 	void *heapLimit;
 
 
-	//for (block = LIST_FIRST(&BlockList);block != NULL;block = block->prev_next_info.le_next) {
-
-		//cprintf("\nmaybe?> allocatedsize: %d, block size: %d,free: %d", allocatedSize, block->size, block->is_free);
-		//if ((uint32)LIST_LAST(&BlockList) == (uint32)block) break;
-		//block = block->prev_next_info.le_next;
-	//}
-
-	//block = NULL;
-	//cprintf("\nlast one: %p, %d, %d\n", exStart, exStart->size, exStart->is_free);
 	LIST_FOREACH(block, &BlockList){
 
-		//cprintf("\ntruth> allocatedsize: %d, block size: %d,free: %d", allocatedSize, block->size, block->is_free);
 		if((block->size >= allocatedSize) && block->is_free == 1){
 
 			uint32 block_size = block->size;
@@ -174,38 +163,6 @@ void *alloc_block_FF(uint32 size)
 	}
 
 
-	//TEST
-	block = LIST_LAST(&BlockList);
-	if((block->size >= allocatedSize) && block->is_free == 1){
-
-		uint32 block_size = block->size;
-
-		allocated = block;
-		allocated->size = allocatedSize;
-		allocated->is_free = 0;
-
-
-		if(block_size != allocatedSize) {
-
-			if((block_size - allocatedSize) < sizeOfMetaData())
-
-				allocated->size = block_size;
-
-			else{
-
-				struct BlockMetaData *newBlock = (void *) block + allocatedSize;
-				LIST_INSERT_AFTER(&BlockList, block, newBlock );
-				newBlock->size = block_size - allocatedSize;
-				newBlock->is_free = 1;
-
-			}
-		}
-
-		return ((void *) allocated + sizeOfMetaData());
-	}
-	//END OF TEST
-
-
 	heapLimit = sbrk(0);
 
 	if((uint32)heapLimit == ((uint32)exStart + exStart->size)){
@@ -220,7 +177,6 @@ void *alloc_block_FF(uint32 size)
 
 			//Total size >= allocatedSize
 			uint32 exSize = exPages * PAGE_SIZE;
-			cprintf("\nsbrk B, %d\n", allocatedSize);
 			heapLimit = sbrk(allocatedSize);
 
 			if(heapLimit == (void *)-1)
@@ -264,8 +220,6 @@ void *alloc_block_FF(uint32 size)
 
 		//Total size >= exAlloc
 		uint32 exSize = exPages * PAGE_SIZE;
-		cprintf("\ndebug: allocated: %d, allocatedSize: %d, size: %d\n", (uint32)allocated, allocatedSize, exStart->size);
-		cprintf("\nsbrk C, %d\n", exAlloc);
 		heapLimit = sbrk(exAlloc);
 
 		if(heapLimit == (void *)-1)
@@ -374,7 +328,6 @@ void *alloc_block_BF(uint32 size)
 		//Total size >= allocatedSize
 		uint32 exSize = exPages * PAGE_SIZE;
 
-		cprintf("\nsbrk D, %d\n", allocatedSize);
 		heapLimit = sbrk(allocatedSize);
 
 		if(heapLimit == (void *)-1)
@@ -434,7 +387,6 @@ void *alloc_block_NF(uint32 size)
 //===================================================
 void free_block(void *va)
 {
-	cprintf("\nbeing freed\n");
 	//TODO: [PROJECT'23.MS1 - #7] [3] DYNAMIC ALLOCATOR - free_block()
 	//panic("free_block is not implemented yet");
 
@@ -480,8 +432,6 @@ void free_block(void *va)
 	}
 
 	block_to_free->is_free = 1;
-	cprintf("\nfreed\n");
-
 
 }
 
