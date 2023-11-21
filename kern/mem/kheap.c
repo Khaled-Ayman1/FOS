@@ -3,6 +3,7 @@
 #include <inc/memlayout.h>
 #include <inc/dynamic_allocator.h>
 #include "memory_manager.h"
+#include <inc/queue.h>
 
 
 int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate, uint32 daLimit)
@@ -53,7 +54,11 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 	}
 
 	if(mappingDone){
+
 		initialize_dynamic_allocator(kstart, kbreak);
+		blockBase = kstart;
+		LIST_INIT(&kernList);
+
 		return 0;
 	}
 
@@ -150,6 +155,7 @@ void* kmalloc(unsigned int size)
 	int remainingSize = size;
 	int numOfPages = 0;
 	int ret,fret,mret;
+	int listSize;
 
 	startPage = endPage = pagePtr;
 
@@ -181,7 +187,7 @@ void* kmalloc(unsigned int size)
 			}
 		}
 
-		uint32 iPage = startPage;
+		uint32 currPage = startPage;
 
 		for(int i = 0; i < numOfPages; i++){
 
@@ -189,13 +195,36 @@ void* kmalloc(unsigned int size)
 
 			if(fret == 0){
 
-				mret = map_frame(ptr_page_directory, ptr_frame_info, iPage, PERM_WRITEABLE);
-				iPage+= PAGE_SIZE;
+				mret = map_frame(ptr_page_directory, ptr_frame_info, currPage, PERM_WRITEABLE);
+				currPage+= PAGE_SIZE;
 
 			}
 		}
 
-		return (void*)startPage;
+		listSize = LIST_SIZE(&kernList) * sizeOfDataInfo();
+
+		struct kheapDataInfo *kdata;
+
+
+		if(LIST_EMPTY(&kernList) ||
+		  ((int)LIST_LAST(&kernList) + sizeOfDataInfo()) >= blockBase + DYN_ALLOC_MAX_BLOCK_SIZE){
+
+			void *newListBlock = alloc_block_FF(DYN_ALLOC_MAX_BLOCK_SIZE);
+			kdata = (struct kheapDataInfo *) newListBlock;
+			blockBase = (int)newListBlock;
+
+		}
+		else
+
+			kdata = (struct kheapDataInfo *) (sizeOfDataInfo() + LIST_LAST(&kernList));
+
+
+		kdata->numOfPages = numOfPages;
+		kdata->va = (void*)startPage;
+
+		LIST_INSERT_TAIL(&kernList, kdata);
+
+		return (void *)startPage;
 
 	}
 
@@ -236,41 +265,24 @@ unsigned int kheap_virtual_address(unsigned int physical_address){
 
 unsigned int kheap_physical_address(unsigned int virtual_address){
 
-	//TODO: [PROJECT'23.MS2 - #06] [1] KERNEL HEAP - kheap_physical_address()
+	uint32 Dir_Entry = ptr_page_directory[PDX(virtual_address)];
 
-	uint32 pdx = PDX(virtual_address);
-	uint32 ptx = PTX(virtual_address);
+	//frame of page table
+	int frameNum = Dir_Entry >> 12;
 
-	// Retrieve the page directory entry
-	uint32 page_directory_entry = ptr_page_directory[pdx];
+	uint32 *ptr_page_table = NULL;
+	int ret = get_page_table(ptr_page_directory, virtual_address, &ptr_page_table);
+	if (ret == TABLE_IN_MEMORY)
+	{
+		uint32 Table_Entry = ptr_page_table [PTX(virtual_address)];
+		//frame of page itself
+		frameNum = Table_Entry >> 12;
+		//calculate physical address within offset
+		uint32 physicalAddr=(frameNum*PAGE_SIZE)+(virtual_address%PAGE_SIZE);
+		return physicalAddr;
 
-	// Check if the page directory entry is present
-	if ((page_directory_entry & PERM_PRESENT) != PERM_PRESENT) {
-		// No mapping, return 0
-		return 0;
 	}
-
-	// Get the frame number of the page table from the page directory entry
-	uint32 frameOfPageTable = EXTRACT_ADDRESS(page_directory_entry);
-
-	// Retrieve the page table entry
-	uint32 *ptr_page_table = (uint32 *) frameOfPageTable;
-	uint32 page_table_entry=ptr_page_table[ptx];
-
-	// Check if the page table entry is present
-	if ((page_table_entry & PERM_PRESENT) != PERM_PRESENT) {
-		// No mapping, return 0
 		return 0;
-	}
-
-	// Calculate the physical address using the page frame and offset
-	uint32 frameOfPage = EXTRACT_ADDRESS(page_table_entry);
-	uint32 offset = virtual_address %PAGE_SIZE;
-
-	// Calculate physical address by combining the frame number and offset
-	uint32 physical_address = (frameOfPage * PAGE_SIZE) + offset;
-
-	return physical_address;
 }
 
 
