@@ -222,6 +222,7 @@ inline void clear_frames_storage(uint32* frames_storage)
 			}
 #else
 			{
+				cprintf("\nfree_frame D");
 				free_frame(to_frame_info(EXTRACT_ADDRESS(frames_storage[i])));
 			}
 #endif

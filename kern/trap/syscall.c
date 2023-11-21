@@ -131,6 +131,7 @@ static int __sys_allocate_page(void *va, int perm)
 		// Temporarily increase the references to prevent unmap_frame from removing the frame
 		// we just got from allocate_frame, we will use it for the new page
 		ptr_frame_info->references += 1;
+		cprintf("\nunmap G\n");
 		unmap_frame(e->env_page_directory, USER_LIMIT);
 
 		//return it to the original status

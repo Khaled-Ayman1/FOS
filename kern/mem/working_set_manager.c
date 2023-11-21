@@ -31,6 +31,7 @@ inline void env_page_ws_invalidate(struct Env* e, uint32 virtual_address)
 			if(ROUNDDOWN(ptr_WS_element->virtual_address,PAGE_SIZE) == ROUNDDOWN(virtual_address,PAGE_SIZE))
 			{
 				struct WorkingSetElement* ptr_tmp_WS_element = LIST_FIRST(&(e->SecondList));
+				cprintf("\nunmap E\n");
 				unmap_frame(e->env_page_directory, ptr_WS_element->virtual_address);
 				LIST_REMOVE(&(e->ActiveList), ptr_WS_element);
 				if(ptr_tmp_WS_element != NULL)
@@ -51,6 +52,7 @@ inline void env_page_ws_invalidate(struct Env* e, uint32 virtual_address)
 			{
 				if(ROUNDDOWN(ptr_WS_element->virtual_address,PAGE_SIZE) == ROUNDDOWN(virtual_address,PAGE_SIZE))
 				{
+					cprintf("\nunmap F\n");
 					unmap_frame(e->env_page_directory, ptr_WS_element->virtual_address);
 					LIST_REMOVE(&(e->SecondList), ptr_WS_element);
 

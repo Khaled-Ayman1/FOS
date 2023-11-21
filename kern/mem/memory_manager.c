@@ -179,13 +179,16 @@ int allocate_frame(struct FrameInfo **ptr_frame_info)
 //
 void free_frame(struct FrameInfo *ptr_frame_info)
 {
+	//cprintf("\nin free frame\n");
 	/*2012: clear it to ensure that its members (env, isBuffered, ...) become NULL*/
 	initialize_frame_info(ptr_frame_info);
 	/*=============================================================================*/
-
+	//cprintf("\nin middle of free\n");
 	// Fill this function in
 	LIST_INSERT_HEAD(&free_frame_list, ptr_frame_info);
 	//LOG_STATMENT(cprintf("FN # %d FREED",to_frame_number(ptr_frame_info)));
+	//cprintf("\nfinsihed free frame\n");
+
 }
 
 //
@@ -195,6 +198,7 @@ void free_frame(struct FrameInfo *ptr_frame_info)
 void decrement_references(struct FrameInfo* ptr_frame_info)
 {
 	if (--(ptr_frame_info->references) == 0)
+		//cprintf("\nfree_frame C");
 		free_frame(ptr_frame_info);
 }
 
@@ -400,6 +404,7 @@ int map_frame(uint32 *ptr_page_directory, struct FrameInfo *ptr_frame_info, uint
 			return 0;
 		//on another pa, then unmap it
 		else
+			cprintf("\nunmap D\n");
 			unmap_frame(ptr_page_directory , virtual_address);
 	}
 	ptr_frame_info->references++;
@@ -461,24 +466,40 @@ struct FrameInfo * get_frame_info(uint32 *ptr_page_directory, uint32 virtual_add
 //
 void unmap_frame(uint32 *ptr_page_directory, uint32 virtual_address)
 {
+	//cprintf("\nin unmap\n");
 	// Fill this function in
 	uint32 *ptr_page_table;
+	//int ret = get_page_table(ptr_page_directory,(uint32) virtual_address, &ptr_page_table);
 	struct FrameInfo* ptr_frame_info = get_frame_info(ptr_page_directory, virtual_address, &ptr_page_table);
 	if( ptr_frame_info != 0 )
 	{
+		//cprintf("\nunmap 1\n");
+
 		if (ptr_frame_info->isBuffered && !CHECK_IF_KERNEL_ADDRESS((uint32)virtual_address))
 			cprintf("WARNING: Freeing BUFFERED frame at va %x!!!\n", virtual_address) ;
+		//cprintf("\nunmap 2\n");
 		decrement_references(ptr_frame_info);
+		//cprintf("\nunmap 3\n");
 
 		/*********************************************************************************/
 		/*NEW'23 el7:)
 		 * TODO: [DONE] unmap_frame(): KEEP THE VALUES OF THE AVAILABLE BITS*/
 		uint32 pte_available_bits = ptr_page_table[PTX(virtual_address)] & PERM_AVAILABLE;
+		//cprintf("\nunmap 4\n");
+
 		ptr_page_table[PTX(virtual_address)] = pte_available_bits;
 		/*********************************************************************************/
+		//cprintf("\nunmap 5\n");
 
 		tlb_invalidate(ptr_page_directory, (void *)virtual_address);
+		//cprintf("\nunmap 6\n");
+
 	}
+	else {
+		//cprintf("\nhow tf\n");
+	}
+	//cprintf("\nfinished unmap\n");
+
 }
 
 
