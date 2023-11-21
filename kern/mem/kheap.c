@@ -207,12 +207,18 @@ void* kmalloc(unsigned int size)
 			}
 		}
 
+		int successfullyAllocatedProcess = 0;
 		for (int i=0; i < maxProccesses; i++) {
 			if (proc_addr[i] == NULL) {
 				proc_addr[i] = (void*)startPage;
 				proc_pages[i] = numOfPages;
+				successfullyAllocatedProcess = 1;
 				break;
 			}
+		}
+
+		if (successfullyAllocatedProcess == 0) {
+			panic("Failed to allocate process!!");
 		}
 
 
@@ -255,10 +261,8 @@ void kfree(void* virtual_address)
 		if(ret == TABLE_IN_MEMORY){
 
 
-			uint32 pages = 0;
-
 			int i = 0;
-			int numOfPages;
+			int numOfPages = -1;
 			for (i =0; i < maxProccesses; i++) {
 				if (proc_addr[i] == virtual_address) {
 					numOfPages = proc_pages[i];
@@ -266,6 +270,10 @@ void kfree(void* virtual_address)
 				}
 			}
 
+			if (numOfPages == -1) {
+				cprintf("Couldn't find process!");
+				return;
+			}
 
 
 			void* currPageAddr = virtual_address;
@@ -296,7 +304,6 @@ unsigned int kheap_virtual_address(unsigned int physical_address){
 
 	struct FrameInfo * ptr ;
 	ptr= to_frame_info(physical_address);
-
 	if (ptr == NULL)
 	{
 	 return 0;
@@ -366,6 +373,116 @@ void *krealloc(void *virtual_address, uint32 new_size)
 {
 	//TODO: [PROJECT'23.MS2 - BONUS#1] [1] KERNEL HEAP - krealloc()
 	// Write your code here, remove the panic and write your code
+
+	if (new_size == 0) {
+		kfree(virtual_address);
+		return NULL;
+	}
+	if (virtual_address == NULL) {
+		return kmalloc(new_size);
+	}
+
+	//check if after it is free
+	int oldNumOfPages = 0;
+	for (int i =0; i < maxProccesses; i++) {
+		if (proc_addr[i] == virtual_address) {
+			oldNumOfPages = proc_pages[i];
+			break;
+		}
+	}
+
+	int newNumOfPages = ROUNDUP(new_size, PAGE_SIZE)/PAGE_SIZE;
+
+	int numDifferences = newNumOfPages - oldNumOfPages;
+
+	uint32 oldLastPage = (uint32)virtual_address + ((oldNumOfPages-1) * PAGE_SIZE);
+
+
+	//2 cases, if negative then deallocate, if positive then allocate above or free it and recall kmalloc if no space above it
+
+	uint32 pagePtr = khl + PAGE_SIZE;
+	uint32* ptr_page_table = NULL;
+	int ret = get_page_table(ptr_page_directory, pagePtr, &ptr_page_table);
+	if(ret != TABLE_IN_MEMORY) return NULL;
+
+	if (numDifferences >= 0) {
+
+
+		//is there enough space after it?
+
+		struct FrameInfo *ptr_frame_info;
+
+		uint32 currPage = oldLastPage;
+		for (int i=0; i < numDifferences-1; i++) {
+			currPage += PAGE_SIZE;
+			ptr_frame_info = get_frame_info(ptr_page_directory, currPage, &ptr_page_table);
+			if (currPage >= khl || ptr_frame_info != 0) {
+				kfree(virtual_address);
+				return kmalloc(new_size);
+			}
+		}
+
+		currPage = oldLastPage;
+		//none of them was taken or didn't hit limit, so allocate the frames
+
+		//get the index of it in the proc arrays
+		int procIndex = 0;
+		for (int j=0; j < maxProccesses; j++) {
+			if (proc_addr[j] == virtual_address) {
+				procIndex = j;
+				break;
+			}
+		}
+
+		for (int i=1; i < numDifferences; i++) {
+			currPage = oldLastPage + (i*PAGE_SIZE);
+			ptr_frame_info = get_frame_info(ptr_page_directory, currPage, &ptr_page_table);
+
+
+			int fret = allocate_frame(&ptr_frame_info);
+			if(fret == 0)
+			{
+				int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
+
+				if(mret != 0){
+					panic("Unsuccessful Map");
+				}
+			}
+
+			//modify number of pages to match new size
+			proc_pages[procIndex] = newNumOfPages;
+
+		}
+
+	}
+
+	//negative difference between pages (decreasing)
+	else {
+		int procIndex = 0;
+		for (int j=0; j < maxProccesses; j++) {
+			if (proc_addr[j] == virtual_address) {
+				procIndex = j;
+				break;
+			}
+		}
+
+
+		struct FrameInfo *ptr_frame_info;
+		uint32 currPage = oldLastPage;
+
+		for (int i = 0; i < (-numDifferences); i++) {
+			ptr_frame_info = get_frame_info(ptr_page_directory, currPage, &ptr_page_table);
+			unmap_frame(ptr_page_directory, currPage);
+			currPage = currPage - PAGE_SIZE;
+
+		}
+
+		//modify number of pages to match new size
+		proc_pages[procIndex] = newNumOfPages;
+
+	}
+
+
 	return NULL;
-	panic("krealloc() is not implemented yet...!!");
+	//panic("krealloc() is not implemented yet...!!");
 }
