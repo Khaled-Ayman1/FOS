@@ -6,6 +6,12 @@
 #include <inc/queue.h>
 
 
+//define the list of processes that will hold each base address and how many pages associated with it
+#define maxProccesses 1024
+void *proc_addr[maxProccesses] = {NULL};
+int proc_pages[maxProccesses] = {0};
+
+
 int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate, uint32 daLimit)
 {
 	//TODO: [PROJECT'23.MS2 - #01] [1] KERNEL HEAP - initialize_kheap_dynamic_allocator()
@@ -57,8 +63,6 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 
 		initialize_dynamic_allocator(kstart, kbreak);
 		blockBase = kstart;
-		LIST_INIT(&kernList);
-
 		return 0;
 	}
 
@@ -75,7 +79,6 @@ void* sbrk(int increment)
 
 	if(increment > 0 && (increment + kbreak) < khl)
 	{
-		cprintf("\n in sbrk, the increment is %d, the kbreak is: %d and pages: %d\n", increment, kbreak, numOfPages);
 		uint32 pagePtr,exStart = kbreak;
 		int fret,mret;
 
@@ -126,9 +129,7 @@ void* sbrk(int increment)
 			get_page_table(ptr_page_directory, exStart, &ptr_page_table);
 			ptr_frame_info = get_frame_info(ptr_page_directory,exStart,&ptr_page_table);
 
-			cprintf("\nunmap B, increment: %d\n", increment);
 			unmap_frame(ptr_page_directory,exStart);
-			cprintf("\nfree_frame B");
 			free_frame(ptr_frame_info);
 
 		}
@@ -147,8 +148,9 @@ void* kmalloc(unsigned int size)
 	if(size <= 0 || size > DYN_ALLOC_MAX_SIZE)
 		return NULL;
 
-	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE)
+	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE) {
 		return alloc_block_FF(size);
+	}
 
 
 	struct FrameInfo *ptr_frame_info;
@@ -205,29 +207,14 @@ void* kmalloc(unsigned int size)
 			}
 		}
 
-		listSize = LIST_SIZE(&kernList) * sizeOfDataInfo();
-
-		struct kheapDataInfo *kdata;
-
-
-		if(LIST_EMPTY(&kernList) ||
-		  ((int)LIST_LAST(&kernList) + sizeOfDataInfo()) >= blockBase + DYN_ALLOC_MAX_BLOCK_SIZE){
-
-			void *newListBlock = alloc_block_FF(DYN_ALLOC_MAX_BLOCK_SIZE);
-			//void *newListBlock = NULL;
-			kdata = (struct kheapDataInfo *) newListBlock;
-			blockBase = (int)newListBlock;
-
+		for (int i=0; i < maxProccesses; i++) {
+			if (proc_addr[i] == NULL) {
+				proc_addr[i] = (void*)startPage;
+				proc_pages[i] = numOfPages;
+				break;
+			}
 		}
-		else
 
-			kdata = (struct kheapDataInfo *) (sizeOfDataInfo() + LIST_LAST(&kernList));
-
-
-		kdata->numOfPages = numOfPages;
-		kdata->va = (void*)startPage;
-
-		LIST_INSERT_TAIL(&kernList, kdata);
 
 		return (void *)startPage;
 
@@ -264,57 +251,34 @@ void kfree(void* virtual_address)
 
 		int ret = get_page_table(ptr_page_directory, pagePtr, &ptr_page_table);
 
-		cprintf("\n VA in FREE: %p\n", virtual_address);
-
 
 		if(ret == TABLE_IN_MEMORY){
 
 
 			uint32 pages = 0;
-			struct kheapDataInfo* page = NULL;
-			LIST_FOREACH(page, &kernList) {
 
-				cprintf("/n va: %p, page: %p, number of pages: %d\n",
-									virtual_address,
-									page->va,
-									page->numOfPages
-									);
-
-				if (page->va == virtual_address) {
-					pages = page->numOfPages;
+			int i = 0;
+			int numOfPages;
+			for (i =0; i < maxProccesses; i++) {
+				if (proc_addr[i] == virtual_address) {
+					numOfPages = proc_pages[i];
 					break;
 				}
-
 			}
 
 
-			void* currPageAddr = NULL;
-			for (int i=0; i < pages; i++) {
 
+			void* currPageAddr = virtual_address;
+			for (int i=0; i < numOfPages; i++) {
 				currPageAddr = virtual_address+(i*PAGE_SIZE);
-				ptr_frame_info = get_frame_info(ptr_page_directory, (uint32)currPageAddr, &ptr_page_table);
-				/**cprintf("\ngonna call unmap now, va: %p, curr va: %p, struct info: ref: %d, va: %d, isbuf: %c\n",
-					virtual_address,
-					currPageAddr,
-					ptr_frame_info->references,
-					ptr_frame_info->va,
-					ptr_frame_info->isBuffered
-				); **/
 
-
-				//cprintf("\nunmap c\n");
 				unmap_frame(ptr_page_directory, (uint32)currPageAddr);
 				//free_frame(ptr_frame_info); //freeing is redundant, unmap_frame automatically calls free
 
-				//cprintf("\ncurr page num: %d, curr va: %p, curr address to free: %p \n", i+1, virtual_address, currPageAddr);
-
-
 			}
-			//cprintf("\nDONE!\n");
 
-
-			//remove it from block allocation
-			free_block(page);
+			//set it to NULL so it can be reused
+			proc_addr[i] = NULL;
 
 		}
 	}

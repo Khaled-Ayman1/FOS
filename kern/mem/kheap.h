@@ -6,8 +6,7 @@
 #endif
 
 #include <inc/types.h>
-#include <inc/queue.h>
-
+//#include <inc/queue.h>
 
 /*2017*/
 uint32 _KHeapPlacementStrategy;
@@ -49,18 +48,6 @@ uint32 kbreak;
 uint32 khl;
 int blockBase;
 
-LIST_HEAD(kheapPageList, kheapDataInfo);
-
-struct kheapPageList kernList;
-
-struct kheapDataInfo
-{
-	uint32 numOfPages;
-	void *va;
-	LIST_ENTRY(kheapDataInfo) prev_next_info;
-};
-
-#define sizeOfDataInfo() (sizeof(struct kheapDataInfo))
 //====================================================================================
 
 #endif // FOS_KERN_KHEAP_H_
