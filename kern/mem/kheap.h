@@ -6,7 +6,7 @@
 #endif
 
 #include <inc/types.h>
-
+//#include <inc/queue.h>
 
 /*2017*/
 uint32 _KHeapPlacementStrategy;
@@ -46,6 +46,8 @@ int numOfKheapVACalls ;
 uint32 kstart;
 uint32 kbreak;
 uint32 khl;
+int blockBase;
+
 //====================================================================================
 
 #endif // FOS_KERN_KHEAP_H_

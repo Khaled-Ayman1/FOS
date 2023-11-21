@@ -3,6 +3,13 @@
 #include <inc/memlayout.h>
 #include <inc/dynamic_allocator.h>
 #include "memory_manager.h"
+#include <inc/queue.h>
+
+
+//define the list of processes that will hold each base address and how many pages associated with it
+#define maxProccesses 1024
+void *proc_addr[maxProccesses] = {NULL};
+int proc_pages[maxProccesses] = {0};
 
 
 int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate, uint32 daLimit)
@@ -53,7 +60,9 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 	}
 
 	if(mappingDone){
+
 		initialize_dynamic_allocator(kstart, kbreak);
+		blockBase = kstart;
 		return 0;
 	}
 
@@ -107,21 +116,22 @@ void* sbrk(int increment)
 
 		struct FrameInfo *ptr_frame_info;
 
-		kbreak -= increment;
+		kbreak += increment;
 		numOfPages *= -1;
 
-		if(increment%PAGE_SIZE != 0)
+		if((-increment)%PAGE_SIZE != 0)
 			numOfPages++;
 
 		for(int i = 0;i<numOfPages;i++)
 		{
+			exStart -= PAGE_SIZE;
+
 			get_page_table(ptr_page_directory, exStart, &ptr_page_table);
 			ptr_frame_info = get_frame_info(ptr_page_directory,exStart,&ptr_page_table);
 
 			unmap_frame(ptr_page_directory,exStart);
 			free_frame(ptr_frame_info);
 
-			exStart -= PAGE_SIZE;
 		}
 		return (void*)kbreak;
 	}
@@ -138,8 +148,9 @@ void* kmalloc(unsigned int size)
 	if(size <= 0 || size > DYN_ALLOC_MAX_SIZE)
 		return NULL;
 
-	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE)
+	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE) {
 		return alloc_block_FF(size);
+	}
 
 
 	struct FrameInfo *ptr_frame_info;
@@ -150,6 +161,7 @@ void* kmalloc(unsigned int size)
 	int remainingSize = size;
 	int numOfPages = 0;
 	int ret,fret,mret;
+	int listSize;
 
 	startPage = endPage = pagePtr;
 
@@ -181,7 +193,7 @@ void* kmalloc(unsigned int size)
 			}
 		}
 
-		uint32 iPage = startPage;
+		uint32 currPage = startPage;
 
 		for(int i = 0; i < numOfPages; i++){
 
@@ -189,13 +201,22 @@ void* kmalloc(unsigned int size)
 
 			if(fret == 0){
 
-				mret = map_frame(ptr_page_directory, ptr_frame_info, iPage, PERM_WRITEABLE);
-				iPage+= PAGE_SIZE;
+				mret = map_frame(ptr_page_directory, ptr_frame_info, currPage, PERM_WRITEABLE);
+				currPage+= PAGE_SIZE;
 
 			}
 		}
 
-		return (void*)startPage;
+		for (int i=0; i < maxProccesses; i++) {
+			if (proc_addr[i] == NULL) {
+				proc_addr[i] = (void*)startPage;
+				proc_pages[i] = numOfPages;
+				break;
+			}
+		}
+
+
+		return (void *)startPage;
 
 	}
 
@@ -214,8 +235,60 @@ void kfree(void* virtual_address)
 	//TODO: [PROJECT'23.MS2 - #04] [1] KERNEL HEAP - kfree()
 	//refer to the project presentation and documentation for details
 	// Write your code here, remove the panic and write your code
-	panic("kfree() is not implemented yet...!!");
+	//panic("kfree() is not implemented yet...!!");
+
+	//block allocator area
+	if (virtual_address >= (void*) KERNEL_HEAP_START && virtual_address <= (void*)khl ) {
+		free_block(virtual_address);
+	}
+
+	//page allocator area
+	else if (virtual_address >= (void*)khl+PAGE_SIZE && virtual_address <= (void*)KERNEL_HEAP_MAX) {
+
+		struct FrameInfo *ptr_frame_info;
+		uint32 pagePtr = khl + PAGE_SIZE;
+		uint32* ptr_page_table = NULL;
+
+		int ret = get_page_table(ptr_page_directory, pagePtr, &ptr_page_table);
+
+
+		if(ret == TABLE_IN_MEMORY){
+
+
+			uint32 pages = 0;
+
+			int i = 0;
+			int numOfPages;
+			for (i =0; i < maxProccesses; i++) {
+				if (proc_addr[i] == virtual_address) {
+					numOfPages = proc_pages[i];
+					break;
+				}
+			}
+
+
+
+			void* currPageAddr = virtual_address;
+			for (int i=0; i < numOfPages; i++) {
+				currPageAddr = virtual_address+(i*PAGE_SIZE);
+
+				unmap_frame(ptr_page_directory, (uint32)currPageAddr);
+				//free_frame(ptr_frame_info); //freeing is redundant, unmap_frame automatically calls free
+
+			}
+
+			//set it to NULL so it can be reused
+			proc_addr[i] = NULL;
+
+		}
+	}
+
+	//invalid address
+	else {
+		panic("Invalid Address passed to kfree()!!");
+	}
 }
+
 
 unsigned int kheap_virtual_address(unsigned int physical_address){
 
@@ -236,41 +309,24 @@ unsigned int kheap_virtual_address(unsigned int physical_address){
 
 unsigned int kheap_physical_address(unsigned int virtual_address){
 
-	//TODO: [PROJECT'23.MS2 - #06] [1] KERNEL HEAP - kheap_physical_address()
+	uint32 Dir_Entry = ptr_page_directory[PDX(virtual_address)];
 
-	uint32 pdx = PDX(virtual_address);
-	uint32 ptx = PTX(virtual_address);
+	//frame of page table
+	int frameNum = Dir_Entry >> 12;
 
-	// Retrieve the page directory entry
-	uint32 page_directory_entry = ptr_page_directory[pdx];
+	uint32 *ptr_page_table = NULL;
+	int ret = get_page_table(ptr_page_directory, virtual_address, &ptr_page_table);
+	if (ret == TABLE_IN_MEMORY)
+	{
+		uint32 Table_Entry = ptr_page_table [PTX(virtual_address)];
+		//frame of page itself
+		frameNum = Table_Entry >> 12;
+		//calculate physical address within offset
+		uint32 physicalAddr=(frameNum*PAGE_SIZE)+(virtual_address%PAGE_SIZE);
+		return physicalAddr;
 
-	// Check if the page directory entry is present
-	if ((page_directory_entry & PERM_PRESENT) != PERM_PRESENT) {
-		// No mapping, return 0
-		return 0;
 	}
-
-	// Get the frame number of the page table from the page directory entry
-	uint32 frameOfPageTable = EXTRACT_ADDRESS(page_directory_entry);
-
-	// Retrieve the page table entry
-	uint32 *ptr_page_table = (uint32 *) frameOfPageTable;
-	uint32 page_table_entry=ptr_page_table[ptx];
-
-	// Check if the page table entry is present
-	if ((page_table_entry & PERM_PRESENT) != PERM_PRESENT) {
-		// No mapping, return 0
 		return 0;
-	}
-
-	// Calculate the physical address using the page frame and offset
-	uint32 frameOfPage = EXTRACT_ADDRESS(page_table_entry);
-	uint32 offset = virtual_address %PAGE_SIZE;
-
-	// Calculate physical address by combining the frame number and offset
-	uint32 physical_address = (frameOfPage * PAGE_SIZE) + offset;
-
-	return physical_address;
 }
 
 
