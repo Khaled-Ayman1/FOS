@@ -105,7 +105,7 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 							map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
 
 					 }else{
-						 panic("rejected");
+						 panic("big problem ,rejected");
 					 }
 
 				 }
