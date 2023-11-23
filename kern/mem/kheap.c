@@ -16,6 +16,7 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 {
 	//TODO: [PROJECT'23.MS2 - #01] [1] KERNEL HEAP - initialize_kheap_dynamic_allocator()
 
+
 	if(initSizeToAllocate > daLimit)
 	{
 		return E_NO_MEM;
@@ -38,17 +39,23 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 	uint32 pagePtr = kstart;
 	uint32 *ptr_page_table = NULL;
 
+
+
 	for(int i = 0;i<iteration;i++)
 	{
+
 		fret = allocate_frame(&ptr_frame_info);
 
 		if(fret == 0)
 		{
+
 			int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
 			if(mret == 0)
 			{
+				ptr_frame_info->va = pagePtr;
 				mappingDone = 1;
-			}else
+			}
+			else
 			{
 				mappingDone = 0;
 				break;
@@ -101,6 +108,9 @@ void* sbrk(int increment)
 				if(mret != 0){
 					panic("Unsuccessful Map");
 				}
+
+				ptr_frame_info->va = pagePtr;
+
 			}
 			pagePtr += PAGE_SIZE;
 		}
@@ -202,6 +212,7 @@ void* kmalloc(unsigned int size)
 			if(fret == 0){
 
 				mret = map_frame(ptr_page_directory, ptr_frame_info, currPage, PERM_WRITEABLE);
+				ptr_frame_info->va = currPage;
 				currPage+= PAGE_SIZE;
 
 			}
@@ -298,18 +309,24 @@ void kfree(void* virtual_address)
 }
 
 
+
 unsigned int kheap_virtual_address(unsigned int physical_address){
 
 	//TODO: [PROJECT'23.MS2 - #05] [1] KERNEL HEAP - kheap_virtual_address()
 
 	struct FrameInfo * ptr ;
 	ptr= to_frame_info(physical_address);
-	if (ptr == NULL)
-	{
-	 return 0;
-	}
 
-	return ptr->va;
+	uint32 va = ptr->va;
+
+	if (ptr == NULL || va<KERNEL_HEAP_START || va >KERNEL_HEAP_MAX)
+
+	  return 0;
+
+
+	uint32 offset = physical_address % PAGE_SIZE;
+
+	return va + offset;
 
 }
 
