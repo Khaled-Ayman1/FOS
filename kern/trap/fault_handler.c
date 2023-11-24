@@ -99,7 +99,7 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 					 map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
 				 }
 				 else{
-					 if ((fault_va < USTACKTOP && fault_va >= USER_HEAP_MAX) ||
+					 if ((fault_va < USTACKTOP && fault_va >= USTACKBOTTOM) ||
 						 (fault_va < USER_HEAP_MAX && fault_va >= USER_HEAP_START))
 					 {
 							map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
