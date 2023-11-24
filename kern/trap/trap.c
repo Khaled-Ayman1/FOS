@@ -380,31 +380,27 @@ void fault_handler(struct Trapframe *tf)
 			//your code is here
 			uint32 perm = pt_get_page_permissions(faulted_env->env_page_directory, fault_va);
 
-				 if ( perm & PERM_PRESENT)
-				{
-					 sched_kill_env(faulted_env->env_id);
-				}
+			if((perm & PERM_USER)==0)
+			{
+				 sched_kill_env(faulted_env->env_id);
+			}
 
+			if((perm & PERM_WRITEABLE)==0)
+			{
+				 sched_kill_env(faulted_env->env_id);
+			}
 
-                if(fault_va>=USER_LIMIT||fault_va>=(USER_LIMIT - PAGE_SIZE))
-				 	{
-				 		sched_kill_env(curenv->env_id);
-				 	}
+			if(fault_va>=USER_LIMIT||fault_va>=(USER_LIMIT - PAGE_SIZE))
+			{
+				sched_kill_env(faulted_env->env_id);
+			}
 
+			if ((perm & PERM_MARKED) == 0){
 
-
-						if ( perm & PERM_WRITEABLE){
-							 sched_kill_env(faulted_env->env_id);
-
-						}
-
+				sched_kill_env(faulted_env->env_id);
+			}
 
 }
-
-
-
-
-
 
 			/*============================================================================================*/
 		}
