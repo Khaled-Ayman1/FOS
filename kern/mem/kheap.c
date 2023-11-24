@@ -3,8 +3,6 @@
 #include <inc/memlayout.h>
 #include <inc/dynamic_allocator.h>
 #include "memory_manager.h"
-#include <inc/queue.h>
-
 
 //define the list of processes that will hold each base address and how many pages associated with it
 #define maxProccesses 1024
@@ -68,8 +66,7 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 
 	if(mappingDone){
 
-		initialize_dynamic_allocator(kstart, kbreak);
-		blockBase = kstart;
+		initialize_dynamic_allocator(kstart, kbreak - kstart);
 		return 0;
 	}
 
@@ -147,8 +144,8 @@ void* sbrk(int increment)
 	}
 
 	panic("Limit Reached");
-	return (void*)-1;
 }
+
 
 
 void* kmalloc(unsigned int size)
@@ -158,9 +155,8 @@ void* kmalloc(unsigned int size)
 	if(size <= 0 || size > DYN_ALLOC_MAX_SIZE)
 		return NULL;
 
-	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE) {
+	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE)
 		return alloc_block_FF(size);
-	}
 
 
 	struct FrameInfo *ptr_frame_info;
@@ -171,7 +167,6 @@ void* kmalloc(unsigned int size)
 	int remainingSize = size;
 	int numOfPages = 0;
 	int ret,fret,mret;
-	int listSize;
 
 	startPage = endPage = pagePtr;
 
@@ -234,13 +229,6 @@ void* kmalloc(unsigned int size)
 
 
 		return (void *)startPage;
-
-	}
-
-
-	if(isKHeapPlacementStrategyBESTFIT()){
-
-		//BONUS
 
 	}
 

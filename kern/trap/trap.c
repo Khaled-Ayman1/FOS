@@ -434,13 +434,10 @@ void fault_handler(struct Trapframe *tf)
 		//		cprintf("\nPage working set AFTER fault handler...\n");
 		//		env_page_ws_print(curenv);
 
-
-	}
-
-	/*************************************************************/
-	//Refresh the TLB cache
-	tlbflush();
-	/*************************************************************/
+		/*************************************************************/
+		//Refresh the TLB cache
+		tlbflush();
+		/*************************************************************/
 
 	}
 
