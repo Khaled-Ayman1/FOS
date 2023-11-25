@@ -214,6 +214,7 @@ struct FrameInfo {
 	struct Env *environment;
 	unsigned char isBuffered;
 	struct WorkingSetElement *element;
+	bool marked;
 };
 
 #endif /* !__ASSEMBLER__ */

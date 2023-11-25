@@ -1038,6 +1038,7 @@ void cleanup_buffers(struct Env* e)
 			//cprintf("[%s] ptr_fi = %x, ptr_fi next = %x \n",curenv->prog_name, ptr_fi, LIST_NEXT(ptr_fi));
 			LIST_REMOVE(&modified_frame_list, ptr_fi);
 
+			cprintf("\nfree_frame E");
 			free_frame(ptr_fi);
 
 			//cprintf("[%s] ptr_fi = %x, ptr_fi next = %x, saved next = %x \n", curenv->prog_name ,ptr_fi, LIST_NEXT(ptr_fi), ___ptr_next);

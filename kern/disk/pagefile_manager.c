@@ -316,6 +316,7 @@ int pf_update_env_page(struct Env* ptr_env, uint32 virtual_address, struct Frame
 		ret = write_disk_page(dfn, (void*)ROUNDDOWN(USER_LIMIT, PAGE_SIZE));
 		// TEMPORARILY increase the references to prevent unmap_frame from removing the frame
 		modified_page_frame_info->references += 1;
+		cprintf("\nunmap A\n");
 		unmap_frame(ptr_env->env_page_directory, USER_LIMIT);
 		// Return it to its original status
 		modified_page_frame_info->references -= 1;
