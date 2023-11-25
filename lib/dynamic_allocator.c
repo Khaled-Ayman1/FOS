@@ -162,12 +162,21 @@ void *alloc_block_FF(uint32 size)
 		}
 	}
 
+
 	heapLimit = sbrk(0);
 
 	if((uint32)heapLimit == ((uint32)exStart + exStart->size)){
 
 		if(exStart->is_free == 0){
 
+			//Pages to be allocated
+			uint32 exPages = allocatedSize / PAGE_SIZE;
+
+			if (allocatedSize % PAGE_SIZE != 0)
+				exPages++;
+
+			//Total size >= allocatedSize
+			uint32 exSize = exPages * PAGE_SIZE;
 			heapLimit = sbrk(allocatedSize);
 
 			if(heapLimit == (void *)-1)
@@ -177,15 +186,41 @@ void *alloc_block_FF(uint32 size)
 			allocated->size = allocatedSize;
 			allocated->is_free = 0;
 
-			LIST_INSERT_TAIL(&BlockList, allocated);
+			LIST_INSERT_AFTER(&BlockList, exStart, allocated);
 
-			//In case LIST_INSERT_TAIL fails uncomment the following:
-			//LIST_INSERT_AFTER(&BlockList, exStart, allocated);
+
+			if(exSize > allocatedSize){
+
+				if((exSize - allocatedSize) < sizeOfMetaData())
+
+					allocated->size = exSize;
+
+				else{
+
+					struct BlockMetaData *newBlock = (void *) allocated + allocatedSize;
+					newBlock->size = exSize - allocatedSize;
+					newBlock->is_free = 1;
+
+					LIST_INSERT_AFTER(&BlockList, allocated, newBlock);
+				}
+			}
 
 			return ((void *) allocated + sizeOfMetaData());
+
 		}
 
-		heapLimit = sbrk((allocatedSize) - (exStart->size));
+		//allocated part of expansion
+		uint32 exAlloc = allocatedSize - (exStart->size);
+
+		//Pages to be allocated
+		uint32 exPages = exAlloc / PAGE_SIZE;
+
+		if (exAlloc % PAGE_SIZE != 0)
+			exPages++;
+
+		//Total size >= exAlloc
+		uint32 exSize = exPages * PAGE_SIZE;
+		heapLimit = sbrk(exAlloc);
 
 		if(heapLimit == (void *)-1)
 			return NULL;
@@ -193,6 +228,22 @@ void *alloc_block_FF(uint32 size)
 		allocated = exStart;
 		allocated->size = allocatedSize;
 		allocated->is_free = 0;
+
+		if(exSize > exAlloc){
+
+			if((exSize - exAlloc) < sizeOfMetaData())
+
+				allocated->size = allocatedSize + exSize;
+
+			else{
+
+				struct BlockMetaData *newBlock = (void *) allocated + allocatedSize;
+				newBlock->size = exSize - exAlloc;
+				newBlock->is_free = 1;
+
+				LIST_INSERT_AFTER(&BlockList, allocated, newBlock);
+			}
+		}
 
 		return ((void *) allocated + sizeOfMetaData());
 	}
@@ -212,6 +263,7 @@ void *alloc_block_BF(uint32 size)
 	if(size <= 0)
 		return NULL;
 
+	struct BlockMetaData *exStart = NULL;
 
 	uint32 allocatedSize = size + sizeOfMetaData();
 	uint32 minSize = 0;
@@ -265,8 +317,16 @@ void *alloc_block_BF(uint32 size)
 		return ((void *) allocated + sizeOfMetaData());
 	}
 
-	else
-	{
+	else{
+
+		//Pages to be allocated
+		uint32 exPages = allocatedSize / PAGE_SIZE;
+
+		if (allocatedSize % PAGE_SIZE != 0)
+			exPages++;
+
+		//Total size >= allocatedSize
+		uint32 exSize = exPages * PAGE_SIZE;
 
 		heapLimit = sbrk(allocatedSize);
 
@@ -276,6 +336,27 @@ void *alloc_block_BF(uint32 size)
 		allocated = heapLimit;
 		allocated->size = allocatedSize;
 		allocated->is_free = 0;
+
+
+		LIST_INSERT_AFTER(&BlockList, exStart, allocated);
+
+		if(exSize > allocatedSize){
+
+			if((exSize - allocatedSize) < sizeOfMetaData())
+
+				allocated->size = exSize;
+
+			else{
+
+				struct BlockMetaData *newBlock = (void *) allocated + allocatedSize;
+				newBlock->size = exSize - allocatedSize;
+				newBlock->is_free = 1;
+
+				LIST_INSERT_AFTER(&BlockList, allocated, newBlock);
+			}
+		}
+
+
 		return ((void *) allocated + sizeOfMetaData());
 	}
 
@@ -351,7 +432,6 @@ void free_block(void *va)
 	}
 
 	block_to_free->is_free = 1;
-
 
 }
 

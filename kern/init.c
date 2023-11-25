@@ -55,7 +55,7 @@ void FOS_initialize()
 	detect_memory();
 	initialize_kernel_VM();
 	initialize_paging();
-	//	page_check();
+	//page_check();
 
 	// Lab 3 user environment initialization functions
 	env_init();
@@ -87,7 +87,6 @@ void FOS_initialize()
 #endif
 	create_shares_array(MAX_SHARES);
 	create_semaphores_array(MAX_SEMAPHORES);
-
 
 	enableBuffering(0);
 	//enableModifiedBuffer(1) ;

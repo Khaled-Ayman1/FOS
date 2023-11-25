@@ -17,8 +17,16 @@ inline struct WorkingSetElement* env_page_ws_list_create_element(struct Env* e, 
 {
 	//TODO: [PROJECT'23.MS2 - #14] [3] PAGE FAULT HANDLER - Create a new working set element
 	// Write your code here, remove the panic and write your code
-	panic("env_page_ws_list_create_element() is not implemented yet...!!");
-	return NULL;
+	struct WorkingSetElement*Element = (struct WorkingSetElement*)kmalloc(sizeof(struct WorkingSetElement));
+
+
+	if (Element == NULL)
+		panic("Null Element!");
+
+	Element->virtual_address=virtual_address;
+	pt_set_page_permissions(e->env_page_directory,virtual_address,0,PERM_MARKED);
+
+	return Element;
 }
 inline void env_page_ws_invalidate(struct Env* e, uint32 virtual_address)
 {
@@ -31,6 +39,7 @@ inline void env_page_ws_invalidate(struct Env* e, uint32 virtual_address)
 			if(ROUNDDOWN(ptr_WS_element->virtual_address,PAGE_SIZE) == ROUNDDOWN(virtual_address,PAGE_SIZE))
 			{
 				struct WorkingSetElement* ptr_tmp_WS_element = LIST_FIRST(&(e->SecondList));
+				cprintf("\nunmap E\n");
 				unmap_frame(e->env_page_directory, ptr_WS_element->virtual_address);
 				LIST_REMOVE(&(e->ActiveList), ptr_WS_element);
 				if(ptr_tmp_WS_element != NULL)
@@ -51,6 +60,7 @@ inline void env_page_ws_invalidate(struct Env* e, uint32 virtual_address)
 			{
 				if(ROUNDDOWN(ptr_WS_element->virtual_address,PAGE_SIZE) == ROUNDDOWN(virtual_address,PAGE_SIZE))
 				{
+					cprintf("\nunmap F\n");
 					unmap_frame(e->env_page_directory, ptr_WS_element->virtual_address);
 					LIST_REMOVE(&(e->SecondList), ptr_WS_element);
 

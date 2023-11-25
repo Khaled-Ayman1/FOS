@@ -283,6 +283,7 @@ int command_remove_table(int number_of_arguments, char **arguments)
 		// set references of the table frame to 0 then free it by adding
 		// to the free frame list
 		table_FrameInfo->references = 0;
+		cprintf("\nfree_frame A");
 		free_frame(table_FrameInfo);
 	}
 

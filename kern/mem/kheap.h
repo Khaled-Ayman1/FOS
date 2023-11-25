@@ -6,7 +6,7 @@
 #endif
 
 #include <inc/types.h>
-
+//#include <inc/queue.h>
 
 /*2017*/
 uint32 _KHeapPlacementStrategy;
@@ -43,6 +43,10 @@ int numOfKheapVACalls ;
 
 /*2023*/
 //TODO: [PROJECT'23.MS2 - #01] [1] KERNEL HEAP - initialization: add suitable code here
+
+uint32 kstart;
+uint32 kbreak;
+uint32 khl;
 
 //====================================================================================
 
