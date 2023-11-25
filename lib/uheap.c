@@ -1,5 +1,8 @@
 #include <inc/lib.h>
 
+#define maxThreads 1024
+void *thrd_addr[maxThreads] = {NULL};
+int thrd_pages[maxThreads] = {0};
 //==================================================================================//
 //============================== GIVEN FUNCTIONS ===================================//
 //==================================================================================//
@@ -35,15 +38,71 @@ void* sbrk(int increment)
 //=================================
 void* malloc(uint32 size)
 {
+
 	//==============================================================
 	//DON'T CHANGE THIS CODE========================================
 	InitializeUHeap();
-	if (size == 0) return NULL ;
+	if (size == 0 || size > DYN_ALLOC_MAX_SIZE) return NULL ;
+
+	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE)
+		return sys_allocate_user_mem(alloc_block_FF(size),size);
+
 	//==============================================================
 	//TODO: [PROJECT'23.MS2 - #09] [2] USER HEAP - malloc() [User Side]
-	// Write your code here, remove the panic and write your code
-	panic("malloc() is not implemented yet...!!");
+
+	if(sys_isUHeapPlacementStrategyFIRSTFIT()){
+
+		uint32 pagePtr; // initialize with uhl + PAGE_SIZE
+		uint32 totalSize;
+		int successfullyAllocatedThread = 0;
+		int thrdSize = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
+		for (int i=0; i < maxThreads; i++) {
+
+			if (thrd_addr[i] == NULL) {
+
+				if(thrd_pages[i] == 0){
+
+					if(i == 0){
+
+						thrd_addr[i] = pagePtr;
+						thrd_pages[i] = thrdSize;
+						return sys_allocate_user_mem(thrd_addr[i], size);
+
+					}
+
+					pagePtr = thrd_addr[i-1] + (thrd_pages[i-1] * PAGE_SIZE)
+					totalSize = pagePtr + (thrd_pages[i]* PAGE_SIZE);
+
+					if(totalSize > USER_HEAP_MAX)
+						return NULL;
+
+					thrd_addr[i] = thrd_addr[i-1] + (thrd_pages[i-1] * PAGE_SIZE);
+					thrd_pages[i] = thrdSize;
+					return sys_allocate_user_mem(thrd_addr[i], size);
+				}
+
+				int totalPages = thrd_pages[i];
+				for(int j = i + 1; j < maxThreads; j++){
+
+					if(thrd_addr[j] != NULL)
+						break;
+					totalPages += thrd_pages[j];
+				}
+				totalSize = totalPages * PAGE_SIZE;
+
+				if(totalSize >= size){
+
+					thrd_addr[i] = pagePtr;
+					thrd_pages[i] = thrdSize;
+					return sys_allocate_user_mem(thrd_addr[i], size);
+
+				}
+			}
+		}
+	}
+//cases not handled: 1) if double 0s mid function 2)merging pages and allocating 3)freeing and merging
 	return NULL;
+
 	//Use sys_isUHeapPlacementStrategyFIRSTFIT() and	sys_isUHeapPlacementStrategyBESTFIT()
 	//to check the current strategy
 
