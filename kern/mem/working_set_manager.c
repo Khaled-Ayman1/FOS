@@ -19,11 +19,13 @@ inline struct WorkingSetElement* env_page_ws_list_create_element(struct Env* e, 
 	// Write your code here, remove the panic and write your code
 	struct WorkingSetElement*Element = (struct WorkingSetElement*)kmalloc(sizeof(struct WorkingSetElement));
 
+
 	if (Element == NULL)
 		panic("Null Element!");
 
 	Element->virtual_address=virtual_address;
 	pt_set_page_permissions(e->env_page_directory,virtual_address,0,PERM_MARKED);
+
 	return Element;
 }
 inline void env_page_ws_invalidate(struct Env* e, uint32 virtual_address)
