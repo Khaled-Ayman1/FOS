@@ -126,9 +126,6 @@ void* sbrk(int increment)
 		kbreak += increment;
 		numOfPages *= -1;
 
-		if((-increment)%PAGE_SIZE != 0)
-			numOfPages++;
-
 		for(int i = 0;i<numOfPages;i++)
 		{
 			exStart -= PAGE_SIZE;

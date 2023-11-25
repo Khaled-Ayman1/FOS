@@ -97,15 +97,17 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 				 if(page != E_PAGE_NOT_EXIST_IN_PF)
 				 {
 					 map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
+					 f->va = v_add;
 				 }
 				 else{
-					 if ((fault_va < USTACKTOP && fault_va >= USTACKBOTTOM) ||
-						 (fault_va < USER_HEAP_MAX && fault_va >= USER_HEAP_START))
+					 if ((fault_va <= USTACKTOP && fault_va >= USTACKBOTTOM) ||
+						 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START))
 					 {
 							map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
+							f->va = v_add;
 
 					 }else{
-						 panic("big problem ,rejected");
+						sched_kill_env(curenv->env_id);
 					 }
 
 				 }
@@ -118,6 +120,15 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 							curenv->page_last_WS_element = new_element;
 						}
 				}
+					LIST_INSERT_TAIL(&(curenv->page_WS_list), new_element);
+					if (LIST_SIZE(&(curenv->page_WS_list)) == curenv->page_WS_max_size)
+					{
+						curenv->page_last_WS_element = LIST_FIRST(&(curenv->page_WS_list));
+					}
+					else
+					{
+						curenv->page_last_WS_element = NULL;
+					}
 			}
 	else
 	{
