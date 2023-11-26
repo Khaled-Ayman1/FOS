@@ -118,6 +118,13 @@ void* sbrk(int increment)
 
 	if(increment < 0)
 	{
+		uint32 temp = increment * -1;
+
+		if(temp > kbreak - kstart)
+		{
+			return (void *)-1;
+		}
+
 		uint32 exStart = kbreak;
 		uint32* ptr_page_table = NULL;
 

@@ -286,9 +286,53 @@ void sys_allocate_user_mem(uint32 virtual_address, uint32 size)
 	return;
 }
 
-uint32 sys_get_uhl(struct Env *e)
+uint32 sys_get_uhl()
 {
-	return e->uhl;
+	return curenv->uhl;
+}
+
+uint32 sys_get_alloc_va(uint32 size)
+{
+	struct FrameInfo *ptr_frame_info;
+	uint32 remainingSize = size;
+	uint32 startPage;
+	uint32 pagePtr = curenv->uhl + PAGE_SIZE;
+	uint32*ptr_page_table= NULL;
+	uint32 ret;
+
+	startPage = pagePtr;
+
+	while(remainingSize > 0)
+	{
+		ret = get_page_table(curenv->env_page_directory,pagePtr,&ptr_page_table);
+
+		if(ret == TABLE_IN_MEMORY)
+		{
+
+			ptr_frame_info = get_frame_info(curenv->env_page_directory,pagePtr,&ptr_page_table);
+			pagePtr += PAGE_SIZE;
+
+			if(ptr_frame_info == 0)
+			{
+				remainingSize -= PAGE_SIZE;
+			}
+			else
+			{
+				startPage = pagePtr;
+				remainingSize = size;
+			}
+
+		}
+	}
+	return startPage;
+}
+
+uint32 sys_get_free_size(uint32 virtual_address)
+{
+	uint32* ptr_page_table = NULL;
+	struct FrameInfo* ptr_frame_info = get_frame_info(curenv->env_page_directory,virtual_address,&ptr_page_table);
+	return ptr_frame_info->numOfpages;
+
 }
 
 void sys_allocate_chunk(uint32 virtual_address, uint32 size, uint32 perms)
@@ -499,7 +543,7 @@ void* sys_sbrk(int increment)
 {
 	//TODO: [PROJECT'23.MS2 - #08] [2] USER HEAP - Block Allocator - sys_sbrk() [Kernel Side]
 	//MS2: COMMENT THIS LINE BEFORE START CODING====
-	return (void*)-1;
+	//return (void*)-1;
 	//====================================================
 
 	/*2023*/
@@ -522,6 +566,58 @@ void* sys_sbrk(int increment)
 	 * 		You might have to undo any operations you have done so far in this case.
 	 */
 	struct Env* env = curenv; //the current running Environment to adjust its break limit
+	uint32 ex_break=env->ubreak;
+
+	// If increment is 0, return the current position of the segment break
+	if (increment == 0) {
+		return (void*)env->ubreak;
+	}
+
+	int numOfPages = increment/PAGE_SIZE;
+
+	if (increment > 0 && (increment + env->ubreak) < env->uhl)
+	{
+
+		if(increment%PAGE_SIZE != 0)
+		{
+			numOfPages++;
+		}
+
+		env->ubreak+= (numOfPages * PAGE_SIZE);
+		return (void*)ex_break;
+
+	}
+	if(increment < 0)
+	{
+		uint32 temp = increment * -1;
+
+		if(temp > env->ubreak - env->ustart)
+		{
+			return (void *)-1;
+		}
+
+		uint32 exStart = env->ubreak;
+		uint32* ptr_page_table = NULL;
+
+		struct FrameInfo *ptr_frame_info;
+
+		env->ubreak += increment;
+		numOfPages *= -1;
+
+		for(int i = 0;i<numOfPages;i++)
+		{
+			exStart -= PAGE_SIZE;
+
+			get_page_table(ptr_page_directory, exStart, &ptr_page_table);
+			ptr_frame_info = get_frame_info(ptr_page_directory,exStart,&ptr_page_table);
+
+			unmap_frame(ptr_page_directory,exStart);
+			free_frame(ptr_frame_info);
+
+		}
+		return (void*)env->ubreak;
+	}
+	return (void*) -1;
 
 
 }
@@ -555,6 +651,14 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 
 	case SYS_get_uhl:
 		return sys_get_uhl((struct Env *)a1);
+		break;
+
+	case SYS_get_alloc_va:
+		return sys_get_alloc_va(a1);
+		break;
+
+	case SYS_get_free_size:
+		return sys_get_free_size(a1);
 		break;
 
 	//=====================================================================
