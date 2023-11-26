@@ -293,36 +293,26 @@ uint32 sys_get_uhl()
 
 uint32 sys_get_alloc_va(uint32 size)
 {
-	struct FrameInfo *ptr_frame_info;
 	uint32 remainingSize = size;
-	uint32 startPage;
 	uint32 pagePtr = curenv->uhl + PAGE_SIZE;
-	uint32*ptr_page_table= NULL;
-	uint32 ret;
+	uint32 startPage = pagePtr;
 
-	startPage = pagePtr;
 
 	while(remainingSize > 0)
 	{
-		ret = get_page_table(curenv->env_page_directory,pagePtr,&ptr_page_table);
+		uint32 perm = pt_get_page_permissions(curenv->env_page_directory, pagePtr);
+		pagePtr += PAGE_SIZE;
 
-		if(ret == TABLE_IN_MEMORY)
+		if((perm & PERM_MARKED) == 0)
 		{
-
-			ptr_frame_info = get_frame_info(curenv->env_page_directory,pagePtr,&ptr_page_table);
-			pagePtr += PAGE_SIZE;
-
-			if(ptr_frame_info == 0)
-			{
-				remainingSize -= PAGE_SIZE;
-			}
-			else
-			{
-				startPage = pagePtr;
-				remainingSize = size;
-			}
-
+			remainingSize -= PAGE_SIZE;
 		}
+		else
+		{
+			startPage = pagePtr;
+			remainingSize = size;
+		}
+
 	}
 	return startPage;
 }
