@@ -556,7 +556,7 @@ void* sys_sbrk(int increment)
 	 * 		You might have to undo any operations you have done so far in this case.
 	 */
 	struct Env* env = curenv; //the current running Environment to adjust its break limit
-	uint32 ex_break=env->ubreak;
+	uint32 ex_break = env->ubreak;
 
 	// If increment is 0, return the current position of the segment break
 	if (increment == 0) {
@@ -568,12 +568,30 @@ void* sys_sbrk(int increment)
 	if (increment > 0 && (increment + env->ubreak) < env->uhl)
 	{
 
+		ex_break = env->ubreak = ROUNDUP(env->ubreak,PAGE_SIZE);
+
 		if(increment%PAGE_SIZE != 0)
 		{
 			numOfPages++;
 		}
 
-		env->ubreak+= (numOfPages * PAGE_SIZE);
+		env->ubreak += (numOfPages * PAGE_SIZE);
+
+		int ret;
+		uint32 *ptr_page_table = NULL;
+
+		for(uint32 pagePtr = ex_break ; pagePtr < env->ubreak; pagePtr += PAGE_SIZE ){
+
+			ret = get_page_table(env->env_page_directory, pagePtr, &ptr_page_table);
+
+			if(ret == TABLE_NOT_EXIST)
+
+				ptr_page_table = create_page_table(env->env_page_directory, pagePtr);
+
+			pt_set_page_permissions(env->env_page_directory, pagePtr, PERM_MARKED | PERM_WRITEABLE | PERM_USER, 0);
+
+		}
+
 		return (void*)ex_break;
 
 	}

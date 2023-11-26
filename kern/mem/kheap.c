@@ -80,7 +80,7 @@ void* sbrk(int increment)
 
 	if(increment > 0 && (increment + kbreak) < khl)
 	{
-		uint32 pagePtr,exStart = kbreak;
+		uint32 pagePtr,exStart = kbreak = ROUNDUP(kbreak,PAGE_SIZE);
 		int fret,mret;
 
 		struct FrameInfo *ptr_frame_info;

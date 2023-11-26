@@ -39,25 +39,18 @@ void* malloc(uint32 size)
 	//==============================================================
 	//DON'T CHANGE THIS CODE========================================
 	InitializeUHeap();
-	if (size == 0 || size > DYN_ALLOC_MAX_SIZE) return NULL ;
+	if (size <= 0 || size > DYN_ALLOC_MAX_SIZE) return NULL ;
 
 	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE)
 	{
-		sys_allocate_user_mem((uint32)alloc_block_FF(size),size);
-		return (void *) 0;
+		return alloc_block_FF(size);
 	}
 
+	uint32 startVa = sys_get_alloc_va(size);
 
-	//==============================================================
-	//TODO: [PROJECT'23.MS2 - #09] [2] USER HEAP - malloc() [User Side]
+	sys_allocate_user_mem(startVa, size);
 
-
-//cases not handled: 1) if double 0s mid function 2)merging pages and allocating 3)freeing and merging
 	return NULL;
-
-	//Use sys_isUHeapPlacementStrategyFIRSTFIT() and	sys_isUHeapPlacementStrategyBESTFIT()
-	//to check the current strategy
-
 }
 
 //=================================
@@ -65,9 +58,9 @@ void* malloc(uint32 size)
 //=================================
 void free(void* virtual_address)
 {
-	//TODO: [PROJECT'23.MS2 - #11] [2] USER HEAP - free() [User Side]
-	// Write your code here, remove the panic and write your code
-	panic("free() is not implemented yet...!!");
+
+
+	//panic("free() is not implemented yet...!!");
 }
 
 

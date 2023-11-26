@@ -117,15 +117,31 @@ uint32 calculate_required_frames(uint32* page_directory, uint32 sva, uint32 size
 //=====================================
 void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 {
-	/*=============================================================================*/
-	//TODO: [PROJECT'23.MS2 - #10] [2] USER HEAP - allocate_user_mem() [Kernel Side]
-	/*REMOVE THESE LINES BEFORE START CODING */
-	inctst();
-	return;
-	/*=============================================================================*/
+	uint32 *ptr_page_table = NULL;
+	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE)/ PAGE_SIZE;
 
-	// Write your code here, remove the panic and write your code
-	panic("allocate_user_mem() is not implemented yet...!!");
+
+	struct FrameInfo *ptr_frame_info = get_frame_info(e->env_page_directory, virtual_address, &ptr_page_table);
+	ptr_frame_info->numOfPages = numOfPages;
+
+	uint32 pagePtr = virtual_address;
+	int ret;
+	for(int i = 0; i < numOfPages; i++){
+
+		ret = get_page_table(e->env_page_directory, pagePtr, &ptr_page_table);
+
+		if(ret == TABLE_NOT_EXIST)
+
+			ptr_page_table = create_page_table(e->env_page_directory, pagePtr);
+
+
+		cprintf("alloc va: %x", pagePtr);
+		pt_set_page_permissions(e->env_page_directory, pagePtr, PERM_MARKED | PERM_WRITEABLE | PERM_USER, 0);
+		pagePtr+=PAGE_SIZE;
+
+	}
+
+	//panic("allocate_user_mem() is not implemented yet...!!");
 }
 
 //=====================================

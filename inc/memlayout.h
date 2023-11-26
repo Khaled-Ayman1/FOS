@@ -215,7 +215,6 @@ struct FrameInfo {
 	unsigned char isBuffered;
 	struct WorkingSetElement *element;
 	uint32 numOfPages;
-	bool marked;
 };
 
 #endif /* !__ASSEMBLER__ */
