@@ -331,7 +331,7 @@ uint32 sys_get_free_size(uint32 virtual_address)
 {
 	uint32* ptr_page_table = NULL;
 	struct FrameInfo* ptr_frame_info = get_frame_info(curenv->env_page_directory,virtual_address,&ptr_page_table);
-	return ptr_frame_info->numOfpages;
+	return ptr_frame_info->numOfPages;
 
 }
 
