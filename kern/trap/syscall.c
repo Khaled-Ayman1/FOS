@@ -298,12 +298,12 @@ uint32 sys_get_alloc_va(uint32 size)
 	uint32 startPage = pagePtr;
 	uint8 allocFlag = 0;
 
-	while(remainingSize > 0)
+	while(remainingSize > 0 && pagePtr < USER_HEAP_MAX)
 	{
 		uint32 perm = pt_get_page_permissions(curenv->env_page_directory, pagePtr);
 		pagePtr += PAGE_SIZE;
 
-		if((perm & PERM_MARKED) == 0)
+		if((perm & PERM_UNMARKED) == PERM_UNMARKED)
 		{
 			remainingSize -= PAGE_SIZE;
 			allocFlag = 1;
@@ -315,8 +315,6 @@ uint32 sys_get_alloc_va(uint32 size)
 			remainingSize = size;
 		}
 
-		if(pagePtr >= USER_HEAP_MAX)
-			break;
 	}
 
 	if(allocFlag)
@@ -599,7 +597,7 @@ void* sys_sbrk(int increment)
 
 				ptr_page_table = create_page_table(env->env_page_directory, pagePtr);
 
-			pt_set_page_permissions(env->env_page_directory, pagePtr, PERM_MARKED | PERM_WRITEABLE | PERM_USER, 0);
+			pt_set_page_permissions(env->env_page_directory, pagePtr, PERM_WRITEABLE | PERM_USER, PERM_UNMARKED);
 
 		}
 
@@ -631,7 +629,7 @@ void* sys_sbrk(int increment)
 			get_page_table(env->env_page_directory, exStart, &ptr_page_table);
 			ptr_frame_info = get_frame_info(env->env_page_directory,exStart,&ptr_page_table);
 
-			pt_set_page_permissions(env->env_page_directory, exStart, 0, PERM_MARKED | PERM_WRITEABLE);
+			pt_set_page_permissions(env->env_page_directory, exStart, PERM_UNMARKED, PERM_WRITEABLE);
 
 			if(ptr_frame_info == 0)
 				continue;

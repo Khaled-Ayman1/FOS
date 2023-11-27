@@ -24,7 +24,6 @@ inline struct WorkingSetElement* env_page_ws_list_create_element(struct Env* e, 
 		panic("Null Element!");
 
 	Element->virtual_address=virtual_address;
-	pt_set_page_permissions(e->env_page_directory,virtual_address,0,PERM_MARKED);
 
 	return Element;
 }

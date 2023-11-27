@@ -93,6 +93,8 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 				 uint32 faulted_page  = allocate_frame(&f);
 				 uint32 v_add = ROUNDDOWN(fault_va, PAGE_SIZE);
 
+				 uint32 perm = pt_get_page_permissions(curenv->env_page_directory, fault_va);
+
 				 uint32 page = pf_read_env_page(curenv, (void*) fault_va);
 				 if(page != E_PAGE_NOT_EXIST_IN_PF)
 				 {
@@ -100,14 +102,17 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 					 f->va = v_add;
 				 }
 				 else{
-					 if ((fault_va <= USTACKTOP && fault_va >= USTACKBOTTOM) ||
-						 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START))
+					 if (((fault_va <= USTACKTOP && fault_va >= USTACKBOTTOM) ||
+						 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START)))
 					 {
 							map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
 							f->va = v_add;
 
 					 }else{
-						sched_kill_env(curenv->env_id);
+
+						 cprintf("\n kill in placement\n");
+
+						 sched_kill_env(curenv->env_id);
 					 }
 
 				 }

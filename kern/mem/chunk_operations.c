@@ -120,10 +120,6 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	uint32 *ptr_page_table = NULL;
 	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE)/ PAGE_SIZE;
 
-
-	struct FrameInfo *ptr_frame_info = get_frame_info(e->env_page_directory, virtual_address, &ptr_page_table);
-	ptr_frame_info->numOfPages = numOfPages;
-
 	uint32 pagePtr = virtual_address;
 	int ret;
 	for(int i = 0; i < numOfPages; i++){
@@ -134,7 +130,8 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 
 			ptr_page_table = create_page_table(e->env_page_directory, pagePtr);
 
-		pt_set_page_permissions(e->env_page_directory, pagePtr, PERM_MARKED | PERM_WRITEABLE | PERM_USER, 0);
+		pt_set_page_permissions(e->env_page_directory, pagePtr, PERM_WRITEABLE | PERM_USER, PERM_UNMARKED);
+
 		pagePtr+=PAGE_SIZE;
 
 	}
@@ -148,30 +145,41 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 {
 	uint32 *ptr_page_table = NULL;
-	struct FrameInfo *ptr_frame_info = get_frame_info(e->env_page_directory, virtual_address, &ptr_page_table);
-	uint32 numOfPages = ptr_frame_info->numOfPages;
+	int ret;
+	struct FrameInfo *ptr_frame_info;
 
 	uint32 pagePtr = virtual_address;
-	for(int i = 0; i < numOfPages; i++){
+	for(int i = 0; i < size; i++){
 
 		ptr_frame_info = get_frame_info(e->env_page_directory, pagePtr, &ptr_page_table);
 
 		if(ptr_frame_info == 0){
-			panic("Unexpected Error!");
+			ret = pt_get_page_permissions(e->env_page_directory, pagePtr);
+			if((ret & PERM_UNMARKED) == PERM_UNMARKED){
+				panic("Invalid Address!! Unmarked");
+				return;
+			}
+			else{
+
+				pt_set_page_permissions(e->env_page_directory, pagePtr, PERM_UNMARKED, PERM_WRITEABLE);
+				pf_remove_env_page(e, pagePtr);
+				return;
+			}
 		}
 
-		pt_set_page_permissions(e->env_page_directory, pagePtr, 0, PERM_MARKED | PERM_WRITEABLE);
+		pt_set_page_permissions(e->env_page_directory, pagePtr, PERM_UNMARKED, PERM_WRITEABLE);
 		pf_remove_env_page(e, pagePtr);
 
-		LIST_REMOVE((&e->ActiveList), ptr_frame_info->element);
+		LIST_REMOVE((&e->ActiveList), ptr_frame_info->element); //O(1)
 
-		// need to check whether frame is actually in WS list
-		unmap_frame(e->env_page_directory, pagePtr);
+		kfree((void *) pagePtr);
+
+		//unmap_frame(e->env_page_directory, pagePtr);
+
+		//env_page_ws_invalidate()
 
 		pagePtr += PAGE_SIZE;
 	}
-
-
 
 	//panic("free_user_mem() is not implemented yet...!!");
 }

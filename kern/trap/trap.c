@@ -393,7 +393,7 @@ void fault_handler(struct Trapframe *tf)
 				 sched_kill_env(faulted_env->env_id);
 			}
 
-			if((perm & PERM_MARKED) == 0 && (perm & PERM_USER))
+			if((perm & PERM_UNMARKED) == PERM_UNMARKED && (perm & PERM_USER))
 			{
 				cprintf("\n marked kill \n");
 				 sched_kill_env(faulted_env->env_id);
