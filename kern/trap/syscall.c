@@ -326,9 +326,6 @@ uint32 sys_get_alloc_va(uint32 size)
 		}
 		*/
 		if((perm & PERM_MARKED) == 0)
-=======
-		if((perm & PERM_UNMARKED) == PERM_UNMARKED)
->>>>>>> check_umem
 		{
 			remainingSize -= PAGE_SIZE;
 			allocFlag = 1;
@@ -579,7 +576,7 @@ void* sys_sbrk(int increment)
 	 * 	2) New segment break should be aligned on page-boundary to avoid "No Man's Land" problem
 	 * 	3) As in real OS, allocate pages lazily. While sbrk moves the segment break, pages are not allocated
 	 * 		until the user program actually tries to access data in its heap (i.e. will be allocated via the fault handler).
-	 * 	4) Allocating additional pages for a process’ heap will fail if, for example, the free frames are exhausted
+	 * 	4) Allocating additional pages for a processÂ’ heap will fail if, for example, the free frames are exhausted
 	 * 		or the break exceed the limit of the dynamic allocator. If sys_sbrk fails, the net effect should
 	 * 		be that sys_sbrk returns (void*) -1 and that the segment break and the process heap are unaffected.
 	 * 		You might have to undo any operations you have done so far in this case.
@@ -620,7 +617,6 @@ void* sys_sbrk(int increment)
 
 				ptr_page_table = create_page_table(env->env_page_directory, pagePtr);
 
-<<<<<<< HEAD
 			pt_set_page_permissions(env->env_page_directory, pagePtr,PERM_WRITEABLE | PERM_USER | PERM_MARKED, 0);
 
 		}
@@ -653,7 +649,6 @@ void* sys_sbrk(int increment)
 			get_page_table(env->env_page_directory, exStart, &ptr_page_table);
 			ptr_frame_info = get_frame_info(env->env_page_directory,exStart,&ptr_page_table);
 
-<<<<<<< HEAD
 			pt_set_page_permissions(env->env_page_directory, exStart, 0,PERM_WRITEABLE | PERM_MARKED);
 
 			if(ptr_frame_info == 0)
