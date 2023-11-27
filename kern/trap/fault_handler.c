@@ -98,6 +98,8 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 				 cprintf("\n fault_va = %x\n",fault_va);
 				 cprintf("\n perm marked=%x\n",(perm & PERM_MARKED));
 
+				 uint32 perm = pt_get_page_permissions(curenv->env_page_directory, fault_va);
+
 				 uint32 page = pf_read_env_page(curenv, (void*) fault_va);
 				 if(page != E_PAGE_NOT_EXIST_IN_PF)
 				 {
@@ -114,8 +116,10 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 							f->va = v_add;
 
 					 }else{
+<<<<<<< HEAD
 						 cprintf("\n kill in placement\n");
 						sched_kill_env(curenv->env_id);
+
 					 }
 
 				 }

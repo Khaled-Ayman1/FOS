@@ -395,6 +395,7 @@ void fault_handler(struct Trapframe *tf)
 				 sched_kill_env(faulted_env->env_id);
 			}
 
+<<<<<<< HEAD
 			if((perm & PERM_MARKED) == 0 && (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START))
 			{
 				cprintf("\n MARKED kill \n");
