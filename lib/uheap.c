@@ -40,7 +40,7 @@ void* sbrk(int increment)
 //=================================
 void* malloc(uint32 size)
 {
-
+	cprintf("IN MALLOC--------------------------------------------");
 	//==============================================================
 	//DON'T CHANGE THIS CODE========================================
 	InitializeUHeap();
@@ -53,16 +53,39 @@ void* malloc(uint32 size)
 	}
 
 	uint32 uhl = sys_get_uhl();
+	uint32 neededPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
+	uint32 startIndex;
+	uint32 counter = 0;
+	uint32 firstIndex;
+	uint32 firstTimeFlag = 0;
+	for(startIndex = (uhl + PAGE_SIZE) / PAGE_SIZE; startIndex < MAX_USER_PAGES; startIndex++){
 
-	uint32 startVa = sys_get_alloc_va(size);
+		if(userPages[startIndex] == 0){
 
-	uint32 index = (startVa - (uhl + PAGE_SIZE)) / PAGE_SIZE;
-	userPages[index] = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
+			if(firstTimeFlag == 0){
+				firstIndex = userPages[startIndex];
+				firstTimeFlag = 1;
+			}
 
+			counter++;
+			if(counter == neededPages)
+				break;
+		}
+		else{
+			counter = 0;
+			startIndex += userPages[startIndex];
+		}
+	}
+
+	//uint32 startVa = sys_get_alloc_va(size);
+
+	uint32 index = firstIndex;
+	userPages[index] = neededPages;
+	uint32 startVa = ((index*PAGE_SIZE) + (uhl + PAGE_SIZE));
 	sys_allocate_user_mem(startVa, size);
 
 
-	return (startVa == 0) ? NULL : (void *)startVa;
+	return (void *)startVa;
 }
 
 //=================================
