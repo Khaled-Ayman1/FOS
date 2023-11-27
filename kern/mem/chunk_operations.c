@@ -117,28 +117,24 @@ uint32 calculate_required_frames(uint32* page_directory, uint32 sva, uint32 size
 //=====================================
 void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 {
-	cprintf("\n inside alloc\n");
 	uint32 *ptr_page_table = NULL;
 	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE)/ PAGE_SIZE;
 
 	uint32 pagePtr = virtual_address;
 	int ret;
-	cprintf("\n numOfPages =%d\n",numOfPages);
 	for(int i = 0; i < numOfPages; i++){
+
 		ret = get_page_table(e->env_page_directory, pagePtr, &ptr_page_table);
 
 		if(ret == TABLE_NOT_EXIST)
 
 			ptr_page_table = create_page_table(e->env_page_directory, pagePtr);
 
-		pt_set_page_permissions(e->env_page_directory, pagePtr,PERM_WRITEABLE | PERM_USER, PERM_UNMARKED);
-		//cprintf("\n ptr=%x",pagePtr);
+		pt_set_page_permissions(e->env_page_directory, pagePtr, PERM_WRITEABLE | PERM_USER | PERM_MARKED, 0);
 
 		pagePtr+=PAGE_SIZE;
 
 	}
-	cprintf("\n pagePtr =%x\n",pagePtr - PAGE_SIZE);
-	cprintf("\n finished alloc\n");
 
 	//panic("allocate_user_mem() is not implemented yet...!!");
 }
@@ -148,32 +144,42 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 //=====================================
 void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 {
-	cprintf("\n inside free");
 	uint32 *ptr_page_table = NULL;
-	struct FrameInfo *ptr_frame_info = get_frame_info(e->env_page_directory, virtual_address, &ptr_page_table);
-	uint32 numOfPages = ptr_frame_info->numOfPages;
+	int ret;
+	struct FrameInfo *ptr_frame_info;
 
 	uint32 pagePtr = virtual_address;
-	for(int i = 0; i < numOfPages; i++){
+	for(int i = 0; i < size; i++){
 
 		ptr_frame_info = get_frame_info(e->env_page_directory, pagePtr, &ptr_page_table);
 
 		if(ptr_frame_info == 0){
-			panic("Unexpected Error!");
+			ret = pt_get_page_permissions(e->env_page_directory, pagePtr);
+			if((ret & PERM_MARKED) == 0){
+				panic("Invalid Address!! Unmarked");
+				return;
+			}
+			else{
+
+				pt_set_page_permissions(e->env_page_directory, pagePtr, 0, PERM_WRITEABLE | PERM_MARKED);
+				pf_remove_env_page(e, pagePtr);
+				return;
+			}
 		}
 
-		pt_set_page_permissions(e->env_page_directory, pagePtr, PERM_UNMARKED,PERM_WRITEABLE);
+		pt_set_page_permissions(e->env_page_directory, pagePtr, 0, PERM_WRITEABLE | PERM_MARKED);
 		pf_remove_env_page(e, pagePtr);
 
-		LIST_REMOVE((&e->ActiveList), ptr_frame_info->element);
+		LIST_REMOVE((&e->ActiveList), ptr_frame_info->element); //O(1)
 
-		// need to check whether frame is actually in WS list
-		unmap_frame(e->env_page_directory, pagePtr);
+		kfree((void *) pagePtr);
+
+		//unmap_frame(e->env_page_directory, pagePtr);
+
+		//env_page_ws_invalidate()
 
 		pagePtr += PAGE_SIZE;
 	}
-
-
 
 	//panic("free_user_mem() is not implemented yet...!!");
 }

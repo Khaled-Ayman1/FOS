@@ -21,6 +21,11 @@ void InitializeUHeap()
 //============================ REQUIRED FUNCTIONS ==================================//
 //==================================================================================//
 
+
+#define MAX_USER_PAGES (USER_HEAP_MAX - USER_HEAP_START) / PAGE_SIZE
+
+uint32 userPages[MAX_USER_PAGES] = {0};
+
 //=============================================
 // [1] CHANGE THE BREAK LIMIT OF THE USER HEAP:
 //=============================================
@@ -47,7 +52,12 @@ void* malloc(uint32 size)
 		return alloc_block_FF(size);
 	}
 
+	uint32 uhl = sys_get_uhl();
+
 	uint32 startVa = sys_get_alloc_va(size);
+
+	uint32 index = (startVa - (uhl + PAGE_SIZE)) / PAGE_SIZE;
+	userPages[index] = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
 
 	sys_allocate_user_mem(startVa, size);
 
@@ -68,9 +78,15 @@ void free(void* virtual_address)
 
 	else if(virtual_address >= (void*) (uhl + PAGE_SIZE) && virtual_address < (void*)USER_HEAP_MAX ){
 
-		uint32 size = sys_get_free_size((uint32)virtual_address);
+		uint32 numOfPages = userPages[(((uint32) virtual_address) - (uhl + PAGE_SIZE)) / PAGE_SIZE];
 
-		sys_free_user_mem((uint32)virtual_address, size);
+		if(numOfPages == 0)
+
+			panic("Invalid Address");
+
+		//sys_get_free_size((uint32)virtual_address);
+
+		sys_free_user_mem((uint32)virtual_address, numOfPages);
 
 	}
 	else

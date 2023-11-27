@@ -309,14 +309,11 @@ uint32 last_fault_va = 0;
 int8 num_repeated_fault  = 0;
 void fault_handler(struct Trapframe *tf)
 {
-
-	cprintf("\n in fault handler invalid\n");
 	int userTrap = 0;
 	if ((tf->tf_cs & 3) == 3) {
 		userTrap = 1;
 	}
 	uint32 fault_va;
-
 
 	// Read processor's CR2 register to find the faulting address
 	fault_va = rcr2();
@@ -362,12 +359,13 @@ void fault_handler(struct Trapframe *tf)
 
 	//get a pointer to the environment that caused the fault at runtime
 	struct Env* faulted_env = curenv;
+
 	//check the faulted address, is it a table or not ?
 	//If the directory entry of the faulted address is NOT PRESENT then
 	if ( (faulted_env->env_page_directory[PDX(fault_va)] & PERM_PRESENT) != PERM_PRESENT)
 	{
 		// we have a table fault =============================================================
-		cprintf("[%s] user TABLE fault va %08x\n", curenv->prog_name, fault_va);
+		//cprintf("[%s] user TABLE fault va %08x\n", curenv->prog_name, fault_va);
 		faulted_env->tableFaultsCounter ++ ;
 
 		table_fault_handler(faulted_env, fault_va);
@@ -381,8 +379,9 @@ void fault_handler(struct Trapframe *tf)
 			//(e.g. pointing to unmarked user heap page, kernel or wrong access rights),
 			//your code is here
 			uint32 perm = pt_get_page_permissions(faulted_env->env_page_directory, fault_va);
+			cprintf("\n in usertrap\n");
 			cprintf("\n perm=%d\n",perm);
-			cprintf("\n perm marked=%d\n",(perm & PERM_UNMARKED));
+			cprintf("\n perm marked=%d\n",(perm & PERM_MARKED));
 			if(fault_va>=USER_LIMIT||fault_va>=(USER_LIMIT - PAGE_SIZE))
 			{
 				cprintf("\n limit kill \n");
@@ -396,15 +395,15 @@ void fault_handler(struct Trapframe *tf)
 				 sched_kill_env(faulted_env->env_id);
 			}
 
-			if((perm & PERM_UNMARKED) == PERM_UNMARKED&& (perm & PERM_USER))
+			if((perm & PERM_MARKED) == 0 && (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START))
 			{
-				cprintf("\n marked kill \n");
-				 sched_kill_env(faulted_env->env_id);
+				cprintf("\n MARKED kill \n");
+				sched_kill_env(faulted_env->env_id);
 			}
 
 
 
-}
+
 
 			/*============================================================================================*/
 		}
@@ -434,10 +433,12 @@ void fault_handler(struct Trapframe *tf)
 		//		cprintf("\nPage working set AFTER fault handler...\n");
 		//		env_page_ws_print(curenv);
 
-		/*************************************************************/
-		//Refresh the TLB cache
-		tlbflush();
-		/*************************************************************/
 
 	}
 
+	/*************************************************************/
+	//Refresh the TLB cache
+	tlbflush();
+	/*************************************************************/
+
+}
