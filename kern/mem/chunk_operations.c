@@ -134,8 +134,6 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 
 			ptr_page_table = create_page_table(e->env_page_directory, pagePtr);
 
-
-		cprintf("alloc va: %x", pagePtr);
 		pt_set_page_permissions(e->env_page_directory, pagePtr, PERM_MARKED | PERM_WRITEABLE | PERM_USER, 0);
 		pagePtr+=PAGE_SIZE;
 
@@ -149,18 +147,33 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 //=====================================
 void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 {
-	/*==========================================================================*/
-	//TODO: [PROJECT'23.MS2 - #12] [2] USER HEAP - free_user_mem() [Kernel Side]
-	/*REMOVE THESE LINES BEFORE START CODING */
-	inctst();
-	return;
-	/*==========================================================================*/
+	uint32 *ptr_page_table = NULL;
+	struct FrameInfo *ptr_frame_info = get_frame_info(e->env_page_directory, virtual_address, &ptr_page_table);
+	uint32 numOfPages = ptr_frame_info->numOfPages;
 
-	// Write your code here, remove the panic and write your code
-	panic("free_user_mem() is not implemented yet...!!");
+	uint32 pagePtr = virtual_address;
+	for(int i = 0; i < numOfPages; i++){
 
-	//TODO: [PROJECT'23.MS2 - BONUS#2] [2] USER HEAP - free_user_mem() IN O(1): removing page from WS List instead of searching the entire list
+		ptr_frame_info = get_frame_info(e->env_page_directory, pagePtr, &ptr_page_table);
 
+		if(ptr_frame_info == 0){
+			panic("Unexpected Error!");
+		}
+
+		pt_set_page_permissions(e->env_page_directory, pagePtr, 0, PERM_MARKED | PERM_WRITEABLE);
+		pf_remove_env_page(e, pagePtr);
+
+		LIST_REMOVE((&e->ActiveList), ptr_frame_info->element);
+
+		// need to check whether frame is actually in WS list
+		unmap_frame(e->env_page_directory, pagePtr);
+
+		pagePtr += PAGE_SIZE;
+	}
+
+
+
+	//panic("free_user_mem() is not implemented yet...!!");
 }
 
 //=====================================

@@ -39,6 +39,7 @@ void* malloc(uint32 size)
 	//==============================================================
 	//DON'T CHANGE THIS CODE========================================
 	InitializeUHeap();
+
 	if (size <= 0 || size > DYN_ALLOC_MAX_SIZE) return NULL ;
 
 	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE)
@@ -50,7 +51,8 @@ void* malloc(uint32 size)
 
 	sys_allocate_user_mem(startVa, size);
 
-	return NULL;
+
+	return (startVa == 0) ? NULL : (void *)startVa;
 }
 
 //=================================
@@ -58,9 +60,21 @@ void* malloc(uint32 size)
 //=================================
 void free(void* virtual_address)
 {
+	uint32 uhl = sys_get_uhl();
 
+	if (virtual_address >= (void*) USER_HEAP_START && virtual_address < (void*)uhl)
 
-	//panic("free() is not implemented yet...!!");
+		free_block(virtual_address);
+
+	else if(virtual_address >= (void*) (uhl + PAGE_SIZE) && virtual_address < (void*)USER_HEAP_MAX ){
+
+		uint32 size = sys_get_free_size((uint32)virtual_address);
+
+		sys_free_user_mem((uint32)virtual_address, size);
+
+	}
+	else
+		panic("Invalid Address");
 }
 
 

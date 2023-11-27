@@ -78,7 +78,7 @@ void* sbrk(int increment)
 
 	int numOfPages = increment/PAGE_SIZE;
 
-	if(increment > 0 && (increment + kbreak) < khl)
+	if(increment > 0 && (increment + kbreak) <= khl)
 	{
 		uint32 pagePtr,exStart = kbreak = ROUNDUP(kbreak,PAGE_SIZE);
 		int fret,mret;
@@ -139,7 +139,6 @@ void* sbrk(int increment)
 			ptr_frame_info = get_frame_info(ptr_page_directory,exStart,&ptr_page_table);
 
 			unmap_frame(ptr_page_directory,exStart);
-			free_frame(ptr_frame_info);
 
 		}
 		return (void*)kbreak;
@@ -184,20 +183,20 @@ void* kmalloc(unsigned int size)
 				pagePtr += PAGE_SIZE;
 
 				if(ptr_frame_info == 0){
-
 					endPage = pagePtr - PAGE_SIZE;
 					remainingSize -= PAGE_SIZE;
 					pages++;
-
 				}
 				else{
-
 					startPage = endPage = pagePtr;
 					remainingSize = size;
 					pages = 0;
 
 				}
 			}
+
+			if(pagePtr >= KERNEL_HEAP_MAX)
+				break;
 		}
 
 		uint32 currPage = startPage;
@@ -234,12 +233,12 @@ void kfree(void* virtual_address)
 	//panic("kfree() is not implemented yet...!!");
 
 	//block allocator area
-	if (virtual_address >= (void*) KERNEL_HEAP_START && virtual_address <= (void*)khl ) {
+	if (virtual_address >= (void*) KERNEL_HEAP_START && virtual_address < (void*)khl ) {
 		free_block(virtual_address);
 	}
 
 	//page allocator area
-	else if (virtual_address >= (void*)khl+PAGE_SIZE && virtual_address <= (void*)KERNEL_HEAP_MAX) {
+	else if (virtual_address >= (void*)khl+PAGE_SIZE && virtual_address < (void*)KERNEL_HEAP_MAX) {
 
 		struct FrameInfo *ptr_frame_info;
 		uint32 pagePtr = khl + PAGE_SIZE;
@@ -260,7 +259,6 @@ void kfree(void* virtual_address)
 				currPageAddr = virtual_address+(i*PAGE_SIZE);
 
 				unmap_frame(ptr_page_directory, (uint32)currPageAddr);
-				//free_frame(ptr_frame_info); //freeing is redundant, unmap_frame automatically calls free
 
 			}
 

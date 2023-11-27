@@ -296,7 +296,7 @@ uint32 sys_get_alloc_va(uint32 size)
 	uint32 remainingSize = size;
 	uint32 pagePtr = curenv->uhl + PAGE_SIZE;
 	uint32 startPage = pagePtr;
-
+	uint8 allocFlag = 0;
 
 	while(remainingSize > 0)
 	{
@@ -306,15 +306,23 @@ uint32 sys_get_alloc_va(uint32 size)
 		if((perm & PERM_MARKED) == 0)
 		{
 			remainingSize -= PAGE_SIZE;
+			allocFlag = 1;
 		}
 		else
 		{
+			allocFlag = 0;
 			startPage = pagePtr;
 			remainingSize = size;
 		}
 
+		if(pagePtr >= USER_HEAP_MAX)
+			break;
 	}
-	return startPage;
+
+	if(allocFlag)
+		return startPage;
+
+	return 0;
 }
 
 uint32 sys_get_free_size(uint32 virtual_address)
@@ -555,6 +563,8 @@ void* sys_sbrk(int increment)
 	 * 		be that sys_sbrk returns (void*) -1 and that the segment break and the process heap are unaffected.
 	 * 		You might have to undo any operations you have done so far in this case.
 	 */
+
+
 	struct Env* env = curenv; //the current running Environment to adjust its break limit
 	uint32 ex_break = env->ubreak;
 
@@ -565,8 +575,9 @@ void* sys_sbrk(int increment)
 
 	int numOfPages = increment/PAGE_SIZE;
 
-	if (increment > 0 && (increment + env->ubreak) < env->uhl)
+	if (increment > 0 && (increment + env->ubreak) <= env->uhl && LIST_SIZE(&free_frame_list) > 0)
 	{
+
 
 		ex_break = env->ubreak = ROUNDUP(env->ubreak,PAGE_SIZE);
 
@@ -595,8 +606,9 @@ void* sys_sbrk(int increment)
 		return (void*)ex_break;
 
 	}
-	if(increment < 0)
+	else if(increment < 0)
 	{
+
 		uint32 temp = increment * -1;
 
 		if(temp > env->ubreak - env->ustart)
@@ -616,16 +628,22 @@ void* sys_sbrk(int increment)
 		{
 			exStart -= PAGE_SIZE;
 
-			get_page_table(ptr_page_directory, exStart, &ptr_page_table);
-			ptr_frame_info = get_frame_info(ptr_page_directory,exStart,&ptr_page_table);
+			get_page_table(env->env_page_directory, exStart, &ptr_page_table);
+			ptr_frame_info = get_frame_info(env->env_page_directory,exStart,&ptr_page_table);
 
-			unmap_frame(ptr_page_directory,exStart);
-			free_frame(ptr_frame_info);
+			pt_set_page_permissions(env->env_page_directory, exStart, 0, PERM_MARKED | PERM_WRITEABLE);
+
+			if(ptr_frame_info == 0)
+				continue;
+
+			unmap_frame(env->env_page_directory,exStart);
 
 		}
 		return (void*)env->ubreak;
 	}
-	return (void*) -1;
+	else
+
+		return (void*) -1;
 
 
 }
