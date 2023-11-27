@@ -116,7 +116,7 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 							f->va = v_add;
 
 					 }else{
-<<<<<<< HEAD
+						 
 						 cprintf("\n kill in placement\n");
 						sched_kill_env(curenv->env_id);
 
