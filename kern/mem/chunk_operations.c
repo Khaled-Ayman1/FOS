@@ -130,7 +130,6 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 
 			ptr_page_table = create_page_table(e->env_page_directory, pagePtr);
 
-<<<<<<< HEAD
 		pt_set_page_permissions(e->env_page_directory, pagePtr, PERM_WRITEABLE | PERM_USER | PERM_MARKED, 0);
 
 		pagePtr+=PAGE_SIZE;
@@ -156,18 +155,14 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 
 		if(ptr_frame_info == 0){
 			ret = pt_get_page_permissions(e->env_page_directory, pagePtr);
-<<<<<<< HEAD
 			if((ret & PERM_MARKED) == 0){
 				panic("Invalid Address!! Unmarked");
 				return;
 			}
 			else{
 
-<<<<<<< HEAD
 				pt_set_page_permissions(e->env_page_directory, pagePtr, 0, PERM_WRITEABLE | PERM_MARKED);
-=======
-				pt_set_page_permissions(e->env_page_directory, pagePtr, PERM_UNMARKED, PERM_WRITEABLE);
->>>>>>> check_umem
+
 				pf_remove_env_page(e, pagePtr);
 				return;
 			}
