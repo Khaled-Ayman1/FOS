@@ -62,6 +62,7 @@ void table_fault_handler(struct Env * curenv, uint32 fault_va)
 	uint32* ptr_table;
 #if USE_KHEAP
 	{
+		cprintf("\n in table fault handler 1 \n");
 		ptr_table = create_page_table(curenv->env_page_directory, (uint32)fault_va);
 	}
 #else
@@ -75,6 +76,7 @@ void table_fault_handler(struct Env * curenv, uint32 fault_va)
 
 void page_fault_handler(struct Env * curenv, uint32 fault_va)
 {
+	cprintf("\n in page fault handler\n");
 #if USE_KHEAP
 		struct WorkingSetElement *victimWSElement = NULL;
 		uint32 wsSize = LIST_SIZE(&(curenv->page_WS_list));
@@ -85,28 +87,34 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 
 		if(wsSize < (curenv->page_WS_max_size))
 			{
-				//cprintf("PLACEMENT=========================WS Size = %d\n", wsSize );
+				cprintf("PLACEMENT=========================WS Size = %d\n", wsSize );
 				//TODO: [PROJECT'23.MS2 - #15] [3] PAGE FAULT HANDLER - Placement
 				// Write your code here, remove the panic and write your code
 				//panic("page_fault_handler().PLACEMENT is not implemented yet...!!");
 				 struct FrameInfo *f;
 				 uint32 faulted_page  = allocate_frame(&f);
 				 uint32 v_add = ROUNDDOWN(fault_va, PAGE_SIZE);
+				 uint32 perm = pt_get_page_permissions(curenv->env_page_directory, fault_va);
+				 cprintf("\n fault_va = %x\n",fault_va);
+				 cprintf("\n perm marked=%x\n",(perm & PERM_UNMARKED));
 
 				 uint32 page = pf_read_env_page(curenv, (void*) fault_va);
 				 if(page != E_PAGE_NOT_EXIST_IN_PF)
 				 {
+					 cprintf("\n here 1\n");
 					 map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
 					 f->va = v_add;
 				 }
 				 else{
-					 if ((fault_va <= USTACKTOP && fault_va >= USTACKBOTTOM) ||
-						 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START))
+					 if (((fault_va <= USTACKTOP && fault_va >= USTACKBOTTOM) ||
+						 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START)))
 					 {
+						 cprintf("\n here 2\n");
 							map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
 							f->va = v_add;
 
 					 }else{
+						 cprintf("\n kill in placement\n");
 						sched_kill_env(curenv->env_id);
 					 }
 
@@ -149,6 +157,7 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 			//TODO: [PROJECT'23.MS3 - BONUS] [1] PAGE FAULT HANDLER - O(1) implementation of LRU replacement
 		}
 	}
+		cprintf("\n outside placement if 1\n");
 }
 
 void __page_fault_handler_with_buffering(struct Env * curenv, uint32 fault_va)

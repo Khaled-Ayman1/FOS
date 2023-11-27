@@ -43,7 +43,6 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 
 		if(fret == 0)
 		{
-
 			int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
 			if(mret == 0)
 			{

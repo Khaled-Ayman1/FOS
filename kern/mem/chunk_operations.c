@@ -117,27 +117,28 @@ uint32 calculate_required_frames(uint32* page_directory, uint32 sva, uint32 size
 //=====================================
 void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 {
+	cprintf("\n inside alloc\n");
 	uint32 *ptr_page_table = NULL;
 	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE)/ PAGE_SIZE;
 
-
-	struct FrameInfo *ptr_frame_info = get_frame_info(e->env_page_directory, virtual_address, &ptr_page_table);
-	ptr_frame_info->numOfPages = numOfPages;
-
 	uint32 pagePtr = virtual_address;
 	int ret;
+	cprintf("\n numOfPages =%d\n",numOfPages);
 	for(int i = 0; i < numOfPages; i++){
-
 		ret = get_page_table(e->env_page_directory, pagePtr, &ptr_page_table);
 
 		if(ret == TABLE_NOT_EXIST)
 
 			ptr_page_table = create_page_table(e->env_page_directory, pagePtr);
 
-		pt_set_page_permissions(e->env_page_directory, pagePtr, PERM_MARKED | PERM_WRITEABLE | PERM_USER, 0);
+		pt_set_page_permissions(e->env_page_directory, pagePtr,PERM_WRITEABLE | PERM_USER, PERM_UNMARKED);
+		//cprintf("\n ptr=%x",pagePtr);
+
 		pagePtr+=PAGE_SIZE;
 
 	}
+	cprintf("\n pagePtr =%x\n",pagePtr - PAGE_SIZE);
+	cprintf("\n finished alloc\n");
 
 	//panic("allocate_user_mem() is not implemented yet...!!");
 }
@@ -147,6 +148,7 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 //=====================================
 void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 {
+	cprintf("\n inside free");
 	uint32 *ptr_page_table = NULL;
 	struct FrameInfo *ptr_frame_info = get_frame_info(e->env_page_directory, virtual_address, &ptr_page_table);
 	uint32 numOfPages = ptr_frame_info->numOfPages;
@@ -160,7 +162,7 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 			panic("Unexpected Error!");
 		}
 
-		pt_set_page_permissions(e->env_page_directory, pagePtr, 0, PERM_MARKED | PERM_WRITEABLE);
+		pt_set_page_permissions(e->env_page_directory, pagePtr, PERM_UNMARKED,PERM_WRITEABLE);
 		pf_remove_env_page(e, pagePtr);
 
 		LIST_REMOVE((&e->ActiveList), ptr_frame_info->element);
