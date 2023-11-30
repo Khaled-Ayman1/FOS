@@ -62,7 +62,6 @@ void table_fault_handler(struct Env * curenv, uint32 fault_va)
 	uint32* ptr_table;
 #if USE_KHEAP
 	{
-		cprintf("\n in table fault handler 1 \n");
 		ptr_table = create_page_table(curenv->env_page_directory, (uint32)fault_va);
 	}
 #else
@@ -76,7 +75,6 @@ void table_fault_handler(struct Env * curenv, uint32 fault_va)
 
 void page_fault_handler(struct Env * curenv, uint32 fault_va)
 {
-	cprintf("\n in page fault handler\n");
 #if USE_KHEAP
 		struct WorkingSetElement *victimWSElement = NULL;
 		uint32 wsSize = LIST_SIZE(&(curenv->page_WS_list));

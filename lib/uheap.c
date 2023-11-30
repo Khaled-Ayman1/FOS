@@ -24,8 +24,6 @@ void InitializeUHeap()
 
 #define MAX_USER_PAGES (USER_HEAP_MAX - USER_HEAP_START) / PAGE_SIZE
 
-uint32 userPages[MAX_USER_PAGES] = {0};
-
 //=============================================
 // [1] CHANGE THE BREAK LIMIT OF THE USER HEAP:
 //=============================================
@@ -38,14 +36,14 @@ void* sbrk(int increment)
 //=================================
 // [2] ALLOCATE SPACE IN USER HEAP:
 //=================================
+
+uint32 userPages[MAX_USER_PAGES] = {0};
+
 void* malloc(uint32 size)
 {
-	cprintf("IN MALLOC--------------------------------------------");
-	//==============================================================
-	//DON'T CHANGE THIS CODE========================================
 	InitializeUHeap();
 
-	if (size <= 0 || size > DYN_ALLOC_MAX_SIZE) return NULL ;
+	if (size == 0 || size > DYN_ALLOC_MAX_SIZE) return NULL ;
 
 	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE)
 	{
@@ -53,17 +51,20 @@ void* malloc(uint32 size)
 	}
 
 	uint32 uhl = sys_get_uhl();
+
 	uint32 neededPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
-	uint32 startIndex;
-	uint32 counter = 0;
-	uint32 firstIndex;
-	uint32 firstTimeFlag = 0;
-	for(startIndex = (uhl + PAGE_SIZE) / PAGE_SIZE; startIndex < MAX_USER_PAGES; startIndex++){
+	uint32 startIndex, firstIndex;
+	uint32 counter, firstTimeFlag;
+
+	counter = firstTimeFlag = 0;
+	startIndex = ((uhl  + PAGE_SIZE) - USER_HEAP_START) / PAGE_SIZE;
+
+	while(startIndex < MAX_USER_PAGES){
 
 		if(userPages[startIndex] == 0){
 
 			if(firstTimeFlag == 0){
-				firstIndex = userPages[startIndex];
+				firstIndex = startIndex;
 				firstTimeFlag = 1;
 			}
 
@@ -73,15 +74,17 @@ void* malloc(uint32 size)
 		}
 		else{
 			counter = 0;
-			startIndex += userPages[startIndex];
+			firstTimeFlag = 0;
+			startIndex += userPages[startIndex] - 1;
 		}
+
+		startIndex++;
 	}
 
 	//uint32 startVa = sys_get_alloc_va(size);
 
-	uint32 index = firstIndex;
-	userPages[index] = neededPages;
-	uint32 startVa = ((index*PAGE_SIZE) + (uhl + PAGE_SIZE));
+	userPages[firstIndex] = neededPages;
+	uint32 startVa = (firstIndex * PAGE_SIZE) + USER_HEAP_START;
 	sys_allocate_user_mem(startVa, size);
 
 
@@ -101,7 +104,7 @@ void free(void* virtual_address)
 
 	else if(virtual_address >= (void*) (uhl + PAGE_SIZE) && virtual_address < (void*)USER_HEAP_MAX ){
 
-		uint32 numOfPages = userPages[(((uint32) virtual_address) - (uhl + PAGE_SIZE)) / PAGE_SIZE];
+		uint32 numOfPages = userPages[(((uint32) virtual_address) - USER_HEAP_START) / PAGE_SIZE];
 
 		if(numOfPages == 0)
 

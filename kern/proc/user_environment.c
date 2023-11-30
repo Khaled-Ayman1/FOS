@@ -24,7 +24,6 @@
 /******************************/
 /* DATA & DECLARATIONS */
 /******************************/
-
 struct Env* envs = NULL;		// All environments
 struct Env* curenv = NULL;	        // The current env
 static struct Env_list env_free_list;	// Free Environment list
@@ -783,6 +782,7 @@ void initialize_uheap_dynamic_allocator(struct Env* e, uint32 daStart, uint32 da
 	e->ustart = daStart;
 	e->ubreak = e->ustart;
 	e->uhl = daLimit;
+
 	initialize_dynamic_allocator(e->ustart, 0);
 }
 

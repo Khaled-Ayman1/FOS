@@ -216,6 +216,9 @@ void _main(void)
 			usedDiskPages = sys_pf_calculate_allocated_pages() ;
 			free(ptr_allocations[0]);
 
+			cprintf("\n\nOld free frames: %d\nExpected Free frames: %d\nError:%d\n\n",freeFrames, sys_calculate_free_frames(), sys_calculate_free_frames() - freeFrames);
+
+
 			if ((usedDiskPages - sys_pf_calculate_allocated_pages()) != 0) panic("Wrong free: Extra or less pages are removed from PageFile");
 			if ((sys_calculate_free_frames() - freeFrames) != 2 ) panic("Wrong free: WS pages in memory and/or page tables are not freed correctly");
 			uint32 notExpectedVAs[2] = { ROUNDDOWN((uint32)(&(byteArr[0])), PAGE_SIZE), ROUNDDOWN((uint32)(&(byteArr[lastIndexOfByte])), PAGE_SIZE)} ;

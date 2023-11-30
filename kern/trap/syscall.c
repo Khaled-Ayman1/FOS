@@ -277,7 +277,7 @@ void sys_free_user_mem(uint32 virtual_address, uint32 size)
 
 void sys_allocate_user_mem(uint32 virtual_address, uint32 size)
 {
-	cprintf("\n inside sys alloc\n");
+
 	if((uint32*)virtual_address==NULL||virtual_address>=USER_LIMIT||virtual_address>=(USER_LIMIT - PAGE_SIZE))
 	{
 		sched_kill_env(curenv->env_id);
