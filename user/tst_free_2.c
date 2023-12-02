@@ -160,19 +160,7 @@ void _main(void)
 		is_correct = 1;
 		//Free last block (coalesce with previous)
 		blockIndex = numOfAllocs*allocCntPerSize-1;
-
-
-		//cprintf("\n\n---------------------------------------------\n\n");
-		//print_blocks_list(BlockList);
-		//cprintf("\n\n---------------------------------------------\n\n");
-
 		free(startVAs[blockIndex]);
-
-
-		//cprintf("\n\n---------------------------------------------\n\n");
-		//print_blocks_list(BlockList);
-		//cprintf("\n\n---------------------------------------------\n\n");
-
 		block_size = get_block_size(startVAs[blockIndex-1]) ;
 		expectedSize = 2*allocSizes[numOfAllocs-1];
 		if (block_size != expectedSize)
@@ -385,22 +373,15 @@ void _main(void)
 
 		actualSize = 3*kilo/2;
 
-		//print_blocks_list(BlockList);
-
 		//dummy allocation to consume the 1st 1.5 KB free block
 		{
 			va = malloc(actualSize);
-			print_blocks_list(BlockList);
 		}
 		//dummy allocation to consume the 1st 2 KB free block
 		{
 			va = malloc(actualSize);
-			//print_blocks_list(BlockList);
 		}
 		va = malloc(actualSize);
-
-		//print_blocks_list(BlockList);
-
 
 		//Check returned va
 		expected = startVAs[numOfAllocs*allocCntPerSize-2];
@@ -412,8 +393,6 @@ void _main(void)
 
 		actualSize = 3*kilo/2;
 		va = malloc(actualSize);
-
-		//print_blocks_list(BlockList);
 
 		//Check returned va
 		expected = (void*)startVAs[numOfAllocs*allocCntPerSize-2] + 3*kilo/2 + sizeOfMetaData();
