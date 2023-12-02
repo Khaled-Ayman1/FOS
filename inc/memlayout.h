@@ -214,6 +214,7 @@ struct FrameInfo {
 	struct Env *environment;
 	unsigned char isBuffered;
 	struct WorkingSetElement *element;
+	uint32 numOfPages;
 };
 
 #endif /* !__ASSEMBLER__ */

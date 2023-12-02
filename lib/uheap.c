@@ -1,8 +1,5 @@
 #include <inc/lib.h>
 
-#define maxThreads 1024
-void *thrd_addr[maxThreads] = {NULL};
-int thrd_pages[maxThreads] = {0};
 //==================================================================================//
 //============================== GIVEN FUNCTIONS ===================================//
 //==================================================================================//
@@ -24,6 +21,9 @@ void InitializeUHeap()
 //============================ REQUIRED FUNCTIONS ==================================//
 //==================================================================================//
 
+
+#define MAX_USER_PAGES (USER_HEAP_MAX - USER_HEAP_START) / PAGE_SIZE
+
 //=============================================
 // [1] CHANGE THE BREAK LIMIT OF THE USER HEAP:
 //=============================================
@@ -36,76 +36,59 @@ void* sbrk(int increment)
 //=================================
 // [2] ALLOCATE SPACE IN USER HEAP:
 //=================================
+
+uint32 userPages[MAX_USER_PAGES] = {0};
+
 void* malloc(uint32 size)
 {
-
-	//==============================================================
-	//DON'T CHANGE THIS CODE========================================
 	InitializeUHeap();
+
 	if (size == 0 || size > DYN_ALLOC_MAX_SIZE) return NULL ;
 
 	if(size <= DYN_ALLOC_MAX_BLOCK_SIZE)
-		return sys_allocate_user_mem(alloc_block_FF(size),size);
-
-	//==============================================================
-	//TODO: [PROJECT'23.MS2 - #09] [2] USER HEAP - malloc() [User Side]
-
-	if(sys_isUHeapPlacementStrategyFIRSTFIT()){
-
-		uint32 pagePtr; // initialize with uhl + PAGE_SIZE
-		uint32 totalSize;
-		int successfullyAllocatedThread = 0;
-		int thrdSize = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
-		for (int i=0; i < maxThreads; i++) {
-
-			if (thrd_addr[i] == NULL) {
-
-				if(thrd_pages[i] == 0){
-
-					if(i == 0){
-
-						thrd_addr[i] = pagePtr;
-						thrd_pages[i] = thrdSize;
-						return sys_allocate_user_mem(thrd_addr[i], size);
-
-					}
-
-					pagePtr = thrd_addr[i-1] + (thrd_pages[i-1] * PAGE_SIZE)
-					totalSize = pagePtr + (thrd_pages[i]* PAGE_SIZE);
-
-					if(totalSize > USER_HEAP_MAX)
-						return NULL;
-
-					thrd_addr[i] = thrd_addr[i-1] + (thrd_pages[i-1] * PAGE_SIZE);
-					thrd_pages[i] = thrdSize;
-					return sys_allocate_user_mem(thrd_addr[i], size);
-				}
-
-				int totalPages = thrd_pages[i];
-				for(int j = i + 1; j < maxThreads; j++){
-
-					if(thrd_addr[j] != NULL)
-						break;
-					totalPages += thrd_pages[j];
-				}
-				totalSize = totalPages * PAGE_SIZE;
-
-				if(totalSize >= size){
-
-					thrd_addr[i] = pagePtr;
-					thrd_pages[i] = thrdSize;
-					return sys_allocate_user_mem(thrd_addr[i], size);
-
-				}
-			}
-		}
+	{
+		return alloc_block_FF(size);
 	}
-//cases not handled: 1) if double 0s mid function 2)merging pages and allocating 3)freeing and merging
-	return NULL;
 
-	//Use sys_isUHeapPlacementStrategyFIRSTFIT() and	sys_isUHeapPlacementStrategyBESTFIT()
-	//to check the current strategy
+	uint32 uhl = sys_get_uhl();
 
+	uint32 neededPages = ROUNDUP(size, PAGE_SIZE) / PAGE_SIZE;
+	uint32 startIndex, firstIndex;
+	uint32 counter, firstTimeFlag;
+
+	counter = firstTimeFlag = 0;
+	startIndex = ((uhl  + PAGE_SIZE) - USER_HEAP_START) / PAGE_SIZE;
+
+	while(startIndex < MAX_USER_PAGES){
+
+		if(userPages[startIndex] == 0){
+
+			if(firstTimeFlag == 0){
+				firstIndex = startIndex;
+				firstTimeFlag = 1;
+			}
+
+			counter++;
+			if(counter == neededPages)
+				break;
+		}
+		else{
+			counter = 0;
+			firstTimeFlag = 0;
+			startIndex += userPages[startIndex] - 1;
+		}
+
+		startIndex++;
+	}
+
+	//uint32 startVa = sys_get_alloc_va(size);
+
+	userPages[firstIndex] = neededPages;
+	uint32 startVa = (firstIndex * PAGE_SIZE) + USER_HEAP_START;
+	sys_allocate_user_mem(startVa, size);
+
+
+	return (void *)startVa;
 }
 
 //=================================
@@ -113,9 +96,28 @@ void* malloc(uint32 size)
 //=================================
 void free(void* virtual_address)
 {
-	//TODO: [PROJECT'23.MS2 - #11] [2] USER HEAP - free() [User Side]
-	// Write your code here, remove the panic and write your code
-	panic("free() is not implemented yet...!!");
+	uint32 uhl = sys_get_uhl();
+
+	if (virtual_address >= (void*) USER_HEAP_START && virtual_address < (void*)uhl)
+
+		free_block(virtual_address);
+
+	else if(virtual_address >= (void*) (uhl + PAGE_SIZE) && virtual_address < (void*)USER_HEAP_MAX ){
+
+		uint32 numOfPages = userPages[(((uint32) virtual_address) - USER_HEAP_START) / PAGE_SIZE];
+
+		if(numOfPages == 0)
+
+			panic("Invalid Address");
+
+		//sys_get_free_size((uint32)virtual_address);
+
+		sys_free_user_mem((uint32)virtual_address, numOfPages);
+		userPages[(((uint32) virtual_address) - USER_HEAP_START) / PAGE_SIZE] = 0;
+
+	}
+	else
+		panic("Invalid Address");
 }
 
 

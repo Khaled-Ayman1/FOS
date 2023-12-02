@@ -117,15 +117,27 @@ uint32 calculate_required_frames(uint32* page_directory, uint32 sva, uint32 size
 //=====================================
 void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 {
-	/*=============================================================================*/
-	//TODO: [PROJECT'23.MS2 - #10] [2] USER HEAP - allocate_user_mem() [Kernel Side]
-	/*REMOVE THESE LINES BEFORE START CODING */
-	inctst();
-	return;
-	/*=============================================================================*/
+	uint32 *ptr_page_table = NULL;
+	uint32 numOfPages = ROUNDUP(size, PAGE_SIZE)/ PAGE_SIZE;
 
-	// Write your code here, remove the panic and write your code
-	panic("allocate_user_mem() is not implemented yet...!!");
+	uint32 pagePtr = virtual_address;
+	int ret;
+	for(int i = 0; i < numOfPages; i++){
+
+		ret = get_page_table(e->env_page_directory, pagePtr, &ptr_page_table);
+
+		if(ret == TABLE_NOT_EXIST)
+
+			ptr_page_table = create_page_table(e->env_page_directory, pagePtr);
+
+
+		pt_set_page_permissions(e->env_page_directory, pagePtr, PERM_WRITEABLE | PERM_USER | PERM_MARKED, 0);
+
+		pagePtr+=PAGE_SIZE;
+
+	}
+
+	//panic("allocate_user_mem() is not implemented yet...!!");
 }
 
 //=====================================
@@ -133,17 +145,33 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 //=====================================
 void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 {
-	/*==========================================================================*/
-	//TODO: [PROJECT'23.MS2 - #12] [2] USER HEAP - free_user_mem() [Kernel Side]
-	/*REMOVE THESE LINES BEFORE START CODING */
-	inctst();
-	return;
-	/*==========================================================================*/
+	uint32 pagePtr = virtual_address;
+	uint32 perm;
+	uint32 numOfPages = size;
 
-	// Write your code here, remove the panic and write your code
-	panic("free_user_mem() is not implemented yet...!!");
+	while(numOfPages > 0){
 
-	//TODO: [PROJECT'23.MS2 - BONUS#2] [2] USER HEAP - free_user_mem() IN O(1): removing page from WS List instead of searching the entire list
+		perm = pt_get_page_permissions(e->env_page_directory,pagePtr);
+
+		if((perm & PERM_PRESENT) == 0){
+			pagePtr += PAGE_SIZE;
+			numOfPages--;
+			continue;
+		}
+
+		pt_set_page_permissions(e->env_page_directory, pagePtr, 0, PERM_WRITEABLE | PERM_MARKED);
+
+		env_page_ws_invalidate(e, pagePtr);
+
+		pf_remove_env_page(e, pagePtr);
+
+		unmap_frame(e->env_page_directory, pagePtr);
+
+		pt_clear_page_table_entry(e->env_page_directory, pagePtr);
+
+		pagePtr += PAGE_SIZE;
+		numOfPages--;
+	}
 
 }
 

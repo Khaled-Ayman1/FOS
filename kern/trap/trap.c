@@ -379,32 +379,21 @@ void fault_handler(struct Trapframe *tf)
 			//(e.g. pointing to unmarked user heap page, kernel or wrong access rights),
 			//your code is here
 			uint32 perm = pt_get_page_permissions(faulted_env->env_page_directory, fault_va);
-
-				 if ( perm & PERM_PRESENT)
-				{
-					 sched_kill_env(faulted_env->env_id);
-				}
-
-
-                if(fault_va>=USER_LIMIT||fault_va>=(USER_LIMIT - PAGE_SIZE))
-				 	{
-				 		sched_kill_env(curenv->env_id);
-				 	}
+			if(fault_va>=USER_LIMIT||fault_va>=(USER_LIMIT - PAGE_SIZE))
+			{
+				sched_kill_env(faulted_env->env_id);
+			}
 
 
+			if((perm & PERM_WRITEABLE) == 0 && (perm & PERM_USER))
+			{
+				 sched_kill_env(faulted_env->env_id);
+			}
 
-						if ( perm & PERM_WRITEABLE){
-							 sched_kill_env(faulted_env->env_id);
-
-						}
-
-
-}
-
-
-
-
-
+			if((perm & PERM_MARKED) == 0 && (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START))
+			{
+				sched_kill_env(faulted_env->env_id);
+			}
 
 			/*============================================================================================*/
 		}
@@ -434,10 +423,12 @@ void fault_handler(struct Trapframe *tf)
 		//		cprintf("\nPage working set AFTER fault handler...\n");
 		//		env_page_ws_print(curenv);
 
-		/*************************************************************/
-		//Refresh the TLB cache
-		tlbflush();
-		/*************************************************************/
 
 	}
 
+	/*************************************************************/
+	//Refresh the TLB cache
+	tlbflush();
+	/*************************************************************/
+
+}

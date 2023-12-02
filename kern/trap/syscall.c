@@ -277,6 +277,7 @@ void sys_free_user_mem(uint32 virtual_address, uint32 size)
 
 void sys_allocate_user_mem(uint32 virtual_address, uint32 size)
 {
+
 	if((uint32*)virtual_address==NULL||virtual_address>=USER_LIMIT||virtual_address>=(USER_LIMIT - PAGE_SIZE))
 	{
 		sched_kill_env(curenv->env_id);
@@ -286,9 +287,22 @@ void sys_allocate_user_mem(uint32 virtual_address, uint32 size)
 	return;
 }
 
-uint32 sys_get_uhl(struct Env *e)
+uint32 sys_get_uhl()
 {
-	return e->uhl;
+	return curenv->uhl;
+}
+
+uint32 sys_get_alloc_va(uint32 size)
+{
+	return 0;
+}
+
+uint32 sys_get_free_size(uint32 virtual_address)
+{
+	uint32* ptr_page_table = NULL;
+	struct FrameInfo* ptr_frame_info = get_frame_info(curenv->env_page_directory,virtual_address,&ptr_page_table);
+	return ptr_frame_info->numOfPages;
+
 }
 
 void sys_allocate_chunk(uint32 virtual_address, uint32 size, uint32 perms)
@@ -499,7 +513,7 @@ void* sys_sbrk(int increment)
 {
 	//TODO: [PROJECT'23.MS2 - #08] [2] USER HEAP - Block Allocator - sys_sbrk() [Kernel Side]
 	//MS2: COMMENT THIS LINE BEFORE START CODING====
-	return (void*)-1;
+	//return (void*)-1;
 	//====================================================
 
 	/*2023*/
@@ -516,12 +530,89 @@ void* sys_sbrk(int increment)
 	 * 	2) New segment break should be aligned on page-boundary to avoid "No Man's Land" problem
 	 * 	3) As in real OS, allocate pages lazily. While sbrk moves the segment break, pages are not allocated
 	 * 		until the user program actually tries to access data in its heap (i.e. will be allocated via the fault handler).
-	 * 	4) Allocating additional pages for a process’ heap will fail if, for example, the free frames are exhausted
+	 * 	4) Allocating additional pages for a processÂ’ heap will fail if, for example, the free frames are exhausted
 	 * 		or the break exceed the limit of the dynamic allocator. If sys_sbrk fails, the net effect should
 	 * 		be that sys_sbrk returns (void*) -1 and that the segment break and the process heap are unaffected.
 	 * 		You might have to undo any operations you have done so far in this case.
 	 */
 	struct Env* env = curenv; //the current running Environment to adjust its break limit
+	uint32 ex_break = env->ubreak;
+
+	// If increment is 0, return the current position of the segment break
+	if (increment == 0) {
+		return (void*)env->ubreak;
+	}
+
+	int numOfPages = increment/PAGE_SIZE;
+
+	if (increment > 0 && (increment + env->ubreak) <= env->uhl && LIST_SIZE(&free_frame_list) > 0)
+	{
+
+		ex_break = env->ubreak = ROUNDUP(env->ubreak,PAGE_SIZE);
+
+		if(increment%PAGE_SIZE != 0)
+		{
+			numOfPages++;
+		}
+
+		env->ubreak += (numOfPages * PAGE_SIZE);
+
+		int ret;
+		uint32 *ptr_page_table = NULL;
+
+		for(uint32 pagePtr = ex_break ; pagePtr < env->ubreak; pagePtr += PAGE_SIZE ){
+
+			ret = get_page_table(env->env_page_directory, pagePtr, &ptr_page_table);
+
+			if(ret == TABLE_NOT_EXIST)
+
+				ptr_page_table = create_page_table(env->env_page_directory, pagePtr);
+
+			pt_set_page_permissions(env->env_page_directory, pagePtr,PERM_WRITEABLE | PERM_USER | PERM_MARKED, 0);
+
+		}
+
+		return (void*)ex_break;
+
+	}
+	else if(increment < 0)
+	{
+
+		uint32 temp = increment * -1;
+
+		if(temp > env->ubreak - env->ustart)
+		{
+			return (void *)-1;
+		}
+
+		uint32 exStart = env->ubreak;
+		uint32* ptr_page_table = NULL;
+
+		struct FrameInfo *ptr_frame_info;
+
+		env->ubreak += increment;
+		numOfPages *= -1;
+
+		for(int i = 0;i<numOfPages;i++)
+		{
+			exStart -= PAGE_SIZE;
+
+			get_page_table(env->env_page_directory, exStart, &ptr_page_table);
+			ptr_frame_info = get_frame_info(env->env_page_directory,exStart,&ptr_page_table);
+
+			pt_set_page_permissions(env->env_page_directory, exStart, 0,PERM_WRITEABLE | PERM_MARKED);
+
+			if(ptr_frame_info == 0)
+				continue;
+
+			unmap_frame(env->env_page_directory,exStart);
+
+		}
+		return (void*)env->ubreak;
+	}
+	else
+
+		return (void*) -1;
 
 
 }
@@ -555,6 +646,14 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 
 	case SYS_get_uhl:
 		return sys_get_uhl((struct Env *)a1);
+		break;
+
+	case SYS_get_alloc_va:
+		return sys_get_alloc_va(a1);
+		break;
+
+	case SYS_get_free_size:
+		return sys_get_free_size(a1);
 		break;
 
 	//=====================================================================

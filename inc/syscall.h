@@ -57,6 +57,8 @@ enum
 	SYS_allocate_user_mem,
 	SYS_free_user_mem,
 	SYS_get_uhl,
+	SYS_get_alloc_va,
+	SYS_get_free_size,
 	//=====================================================================
 	NSYSCALLS
 };

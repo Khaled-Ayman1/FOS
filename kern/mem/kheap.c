@@ -5,9 +5,6 @@
 #include "memory_manager.h"
 
 //define the list of processes that will hold each base address and how many pages associated with it
-#define maxProccesses 1024
-void *proc_addr[maxProccesses] = {NULL};
-int proc_pages[maxProccesses] = {0};
 
 
 int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate, uint32 daLimit)
@@ -46,7 +43,6 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 
 		if(fret == 0)
 		{
-
 			int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
 			if(mret == 0)
 			{
@@ -81,9 +77,9 @@ void* sbrk(int increment)
 
 	int numOfPages = increment/PAGE_SIZE;
 
-	if(increment > 0 && (increment + kbreak) < khl)
+	if(increment > 0 && (increment + kbreak) <= khl)
 	{
-		uint32 pagePtr,exStart = kbreak;
+		uint32 pagePtr,exStart = kbreak = ROUNDUP(kbreak,PAGE_SIZE);
 		int fret,mret;
 
 		struct FrameInfo *ptr_frame_info;
@@ -118,6 +114,14 @@ void* sbrk(int increment)
 
 	if(increment < 0)
 	{
+
+		//ensure it doesn't go beyond the start downwards
+		if((-increment) > (kbreak - kstart))
+		{
+		    return (void *)-1;
+		}
+
+
 		uint32 exStart = kbreak;
 		uint32* ptr_page_table = NULL;
 
@@ -125,9 +129,6 @@ void* sbrk(int increment)
 
 		kbreak += increment;
 		numOfPages *= -1;
-
-		if((-increment)%PAGE_SIZE != 0)
-			numOfPages++;
 
 		for(int i = 0;i<numOfPages;i++)
 		{
@@ -137,7 +138,6 @@ void* sbrk(int increment)
 			ptr_frame_info = get_frame_info(ptr_page_directory,exStart,&ptr_page_table);
 
 			unmap_frame(ptr_page_directory,exStart);
-			free_frame(ptr_frame_info);
 
 		}
 		return (void*)kbreak;
@@ -165,7 +165,7 @@ void* kmalloc(unsigned int size)
 	uint32 startPage,endPage;
 	uint32* ptr_page_table = NULL;
 	int remainingSize = size;
-	int numOfPages = 0;
+	int pages = 0;
 	int ret,fret,mret;
 
 	startPage = endPage = pagePtr;
@@ -182,25 +182,25 @@ void* kmalloc(unsigned int size)
 				pagePtr += PAGE_SIZE;
 
 				if(ptr_frame_info == 0){
-
 					endPage = pagePtr - PAGE_SIZE;
 					remainingSize -= PAGE_SIZE;
-					numOfPages++;
-
+					pages++;
 				}
 				else{
-
 					startPage = endPage = pagePtr;
 					remainingSize = size;
-					numOfPages = 0;
+					pages = 0;
 
 				}
 			}
+
+			if(pagePtr >= KERNEL_HEAP_MAX)
+				break;
 		}
 
 		uint32 currPage = startPage;
 
-		for(int i = 0; i < numOfPages; i++){
+		for(int i = 0; i < pages; i++){
 
 			fret = allocate_frame(&ptr_frame_info);
 
@@ -213,19 +213,8 @@ void* kmalloc(unsigned int size)
 			}
 		}
 
-		int successfullyAllocatedProcess = 0;
-		for (int i=0; i < maxProccesses; i++) {
-			if (proc_addr[i] == NULL) {
-				proc_addr[i] = (void*)startPage;
-				proc_pages[i] = numOfPages;
-				successfullyAllocatedProcess = 1;
-				break;
-			}
-		}
-
-		if (successfullyAllocatedProcess == 0) {
-			panic("Failed to allocate process!!");
-		}
+		ptr_frame_info = get_frame_info(ptr_page_directory, startPage, &ptr_page_table);
+		ptr_frame_info->numOfPages = pages;
 
 
 		return (void *)startPage;
@@ -243,12 +232,12 @@ void kfree(void* virtual_address)
 	//panic("kfree() is not implemented yet...!!");
 
 	//block allocator area
-	if (virtual_address >= (void*) KERNEL_HEAP_START && virtual_address <= (void*)khl ) {
+	if (virtual_address >= (void*) KERNEL_HEAP_START && virtual_address < (void*)khl ) {
 		free_block(virtual_address);
 	}
 
 	//page allocator area
-	else if (virtual_address >= (void*)khl+PAGE_SIZE && virtual_address <= (void*)KERNEL_HEAP_MAX) {
+	else if (virtual_address >= (void*)khl+PAGE_SIZE && virtual_address < (void*)KERNEL_HEAP_MAX) {
 
 		struct FrameInfo *ptr_frame_info;
 		uint32 pagePtr = khl + PAGE_SIZE;
@@ -260,32 +249,18 @@ void kfree(void* virtual_address)
 		if(ret == TABLE_IN_MEMORY){
 
 
-			int i = 0;
-			int numOfPages = -1;
-			for (i =0; i < maxProccesses; i++) {
-				if (proc_addr[i] == virtual_address) {
-					numOfPages = proc_pages[i];
-					break;
-				}
-			}
-
-			if (numOfPages == -1) {
-				cprintf("Couldn't find process!");
-				return;
-			}
+			ptr_frame_info = get_frame_info(ptr_page_directory, (uint32)virtual_address, &ptr_page_table);
+			uint32 pages = ptr_frame_info->numOfPages;
 
 
 			void* currPageAddr = virtual_address;
-			for (int i=0; i < numOfPages; i++) {
+			for (int i=0; i < pages; i++) {
 				currPageAddr = virtual_address+(i*PAGE_SIZE);
 
 				unmap_frame(ptr_page_directory, (uint32)currPageAddr);
-				//free_frame(ptr_frame_info); //freeing is redundant, unmap_frame automatically calls free
 
 			}
 
-			//set it to NULL so it can be reused
-			proc_addr[i] = NULL;
 
 		}
 	}
@@ -387,17 +362,19 @@ void *krealloc(void *virtual_address, uint32 new_size)
 		return kmalloc(new_size);
 	}
 
+
+
+	uint32 pagePtr = khl + PAGE_SIZE;
+	uint32* ptr_page_table = NULL;
+	int ret = get_page_table(ptr_page_directory, pagePtr, &ptr_page_table);
+	if(ret != TABLE_IN_MEMORY) return NULL;
+	struct FrameInfo *ptr_frame_info;
+
 	//check if after it is free
-	int oldNumOfPages = 0;
-	for (int i =0; i < maxProccesses; i++) {
-		if (proc_addr[i] == virtual_address) {
-			oldNumOfPages = proc_pages[i];
-			break;
-		}
-	}
+	ptr_frame_info = get_frame_info(ptr_page_directory, (uint32)virtual_address, &ptr_page_table);
 
+	uint32 oldNumOfPages = ptr_frame_info->numOfPages;
 	int newNumOfPages = ROUNDUP(new_size, PAGE_SIZE)/PAGE_SIZE;
-
 	int numDifferences = newNumOfPages - oldNumOfPages;
 
 	uint32 oldLastPage = (uint32)virtual_address + ((oldNumOfPages-1) * PAGE_SIZE);
@@ -405,17 +382,11 @@ void *krealloc(void *virtual_address, uint32 new_size)
 
 	//2 cases, if negative then deallocate, if positive then allocate above or free it and recall kmalloc if no space above it
 
-	uint32 pagePtr = khl + PAGE_SIZE;
-	uint32* ptr_page_table = NULL;
-	int ret = get_page_table(ptr_page_directory, pagePtr, &ptr_page_table);
-	if(ret != TABLE_IN_MEMORY) return NULL;
 
 	if (numDifferences >= 0) {
 
 
 		//is there enough space after it?
-
-		struct FrameInfo *ptr_frame_info;
 
 		uint32 currPage = oldLastPage;
 		for (int i=0; i < numDifferences-1; i++) {
@@ -430,14 +401,6 @@ void *krealloc(void *virtual_address, uint32 new_size)
 		currPage = oldLastPage;
 		//none of them was taken or didn't hit limit, so allocate the frames
 
-		//get the index of it in the proc arrays
-		int procIndex = 0;
-		for (int j=0; j < maxProccesses; j++) {
-			if (proc_addr[j] == virtual_address) {
-				procIndex = j;
-				break;
-			}
-		}
 
 		for (int i=1; i < numDifferences; i++) {
 			currPage = oldLastPage + (i*PAGE_SIZE);
@@ -449,30 +412,20 @@ void *krealloc(void *virtual_address, uint32 new_size)
 			{
 				int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
 
-				if(mret != 0){
+				if(mret != 0) {
 					panic("Unsuccessful Map");
 				}
+
+				ptr_frame_info->va = pagePtr;
+
 			}
-
-			//modify number of pages to match new size
-			proc_pages[procIndex] = newNumOfPages;
-
 		}
 
 	}
 
 	//negative difference between pages (decreasing)
 	else {
-		int procIndex = 0;
-		for (int j=0; j < maxProccesses; j++) {
-			if (proc_addr[j] == virtual_address) {
-				procIndex = j;
-				break;
-			}
-		}
 
-
-		struct FrameInfo *ptr_frame_info;
 		uint32 currPage = oldLastPage;
 
 		for (int i = 0; i < (-numDifferences); i++) {
@@ -482,11 +435,10 @@ void *krealloc(void *virtual_address, uint32 new_size)
 
 		}
 
-		//modify number of pages to match new size
-		proc_pages[procIndex] = newNumOfPages;
-
 	}
 
+	ptr_frame_info = get_frame_info(ptr_page_directory, (uint32)virtual_address, &ptr_page_table);
+	ptr_frame_info->numOfPages = newNumOfPages;
 
 	return virtual_address;
 
