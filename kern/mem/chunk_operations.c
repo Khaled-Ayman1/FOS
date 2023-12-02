@@ -145,53 +145,32 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 //=====================================
 void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 {
-	uint32 *ptr_page_table = NULL;
-	int ret, pret, prev_ret, flag;
-	struct FrameInfo *ptr_frame_info;
-
 	uint32 pagePtr = virtual_address;
-	flag = 0;
+	uint32 perm;
+	uint32 numOfPages = size;
 
-	for(int i = 0; i < size; i++){
+	while(numOfPages > 0){
 
-		ptr_frame_info = get_frame_info(e->env_page_directory, pagePtr, &ptr_page_table);
-		ret = get_page_table(e->env_page_directory, pagePtr, &ptr_page_table);
+		perm = pt_get_page_permissions(e->env_page_directory,pagePtr);
 
-		if(ret != prev_ret && flag == 1){ //remove page tables when done iterating over them
-			pd_clear_page_dir_entry(e->env_page_directory, pagePtr - PAGE_SIZE);
-		}
-		flag = 1;
-		prev_ret = ret;
-
-		if(ptr_frame_info == 0){
-			pret = pt_get_page_permissions(e->env_page_directory, pagePtr);
-			if((pret & PERM_MARKED) == 0){
-				panic("Invalid Address!! Unmarked");
-				return;
-			}
-			else{
-
-				pt_set_page_permissions(e->env_page_directory, pagePtr, 0, PERM_WRITEABLE | PERM_MARKED);
-				pf_remove_env_page(e, pagePtr);
-				pt_clear_page_table_entry(e->env_page_directory, pagePtr); //clear entries
-
-				return;
-			}
+		if((perm & PERM_PRESENT) == 0){
+			pagePtr += PAGE_SIZE;
+			numOfPages--;
+			continue;
 		}
 
 		pt_set_page_permissions(e->env_page_directory, pagePtr, 0, PERM_WRITEABLE | PERM_MARKED);
-		pf_remove_env_page(e, pagePtr);
 
 		env_page_ws_invalidate(e, pagePtr);
+
+		pf_remove_env_page(e, pagePtr);
 
 		unmap_frame(e->env_page_directory, pagePtr);
 
 		pt_clear_page_table_entry(e->env_page_directory, pagePtr);
 
-		//Free frames before free: 62801
-		//Expected to pass test: 62803
-
 		pagePtr += PAGE_SIZE;
+		numOfPages--;
 	}
 
 }

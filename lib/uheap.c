@@ -113,6 +113,7 @@ void free(void* virtual_address)
 		//sys_get_free_size((uint32)virtual_address);
 
 		sys_free_user_mem((uint32)virtual_address, numOfPages);
+		userPages[(((uint32) virtual_address) - USER_HEAP_START) / PAGE_SIZE] = 0;
 
 	}
 	else

@@ -379,31 +379,21 @@ void fault_handler(struct Trapframe *tf)
 			//(e.g. pointing to unmarked user heap page, kernel or wrong access rights),
 			//your code is here
 			uint32 perm = pt_get_page_permissions(faulted_env->env_page_directory, fault_va);
-			cprintf("\n in usertrap\n");
-			cprintf("\n perm=%d\n",perm);
-			cprintf("\n perm marked=%d\n",(perm & PERM_MARKED));
 			if(fault_va>=USER_LIMIT||fault_va>=(USER_LIMIT - PAGE_SIZE))
 			{
-				cprintf("\n limit kill \n");
 				sched_kill_env(faulted_env->env_id);
 			}
 
 
 			if((perm & PERM_WRITEABLE) == 0 && (perm & PERM_USER))
 			{
-				cprintf("\n writeable kill \n");
 				 sched_kill_env(faulted_env->env_id);
 			}
 
 			if((perm & PERM_MARKED) == 0 && (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START))
 			{
-				cprintf("\n MARKED kill \n");
 				sched_kill_env(faulted_env->env_id);
 			}
-
-
-
-
 
 			/*============================================================================================*/
 		}

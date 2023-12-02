@@ -294,52 +294,6 @@ uint32 sys_get_uhl()
 
 uint32 sys_get_alloc_va(uint32 size)
 {
-	uint32 remainingSize = size;
-	uint32 pagePtr = curenv->uhl + PAGE_SIZE;
-	uint32 startPage = pagePtr;
-	uint8 allocFlag = 0;
-	uint8 counter = 2;
-
-
-	while(remainingSize > 0 && pagePtr < USER_HEAP_MAX)
-	{
-
-		uint32 perm = pt_get_page_permissions(curenv->env_page_directory, pagePtr);
-		/*
-		if(counter > 0){
-			cprintf("\n ptr=%x",pagePtr);
-			cprintf("\n perm=%x",(perm & PERM_MARKED));
-			cprintf("\n first");
-		}
-		*/
-		pagePtr += PAGE_SIZE;
-		/*
-		if((perm & PERM_MARKED) == 0)
-		{
-			if(counter > 0){
-			cprintf("\n ptr=%x",pagePtr);
-			cprintf("\n perm=%x",(perm & PERM_MARKED));
-			counter--;
-			}
-
-
-		}
-		*/
-		if((perm & PERM_MARKED) == 0)
-		{
-			remainingSize -= PAGE_SIZE;
-			allocFlag = 1;
-		}
-		else
-		{
-			allocFlag = 0;
-			startPage = pagePtr;
-			remainingSize = size;
-		}
-	}
-	if(allocFlag)
-		return startPage;
-
 	return 0;
 }
 
@@ -581,8 +535,6 @@ void* sys_sbrk(int increment)
 	 * 		be that sys_sbrk returns (void*) -1 and that the segment break and the process heap are unaffected.
 	 * 		You might have to undo any operations you have done so far in this case.
 	 */
-
-	cprintf("\n INSIDE SYSCALL SBRK\n");
 	struct Env* env = curenv; //the current running Environment to adjust its break limit
 	uint32 ex_break = env->ubreak;
 
@@ -595,7 +547,6 @@ void* sys_sbrk(int increment)
 
 	if (increment > 0 && (increment + env->ubreak) <= env->uhl && LIST_SIZE(&free_frame_list) > 0)
 	{
-
 
 		ex_break = env->ubreak = ROUNDUP(env->ubreak,PAGE_SIZE);
 

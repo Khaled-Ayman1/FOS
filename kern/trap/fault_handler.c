@@ -84,60 +84,52 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 #endif
 
 		if(wsSize < (curenv->page_WS_max_size))
-			{
-				cprintf("PLACEMENT=========================WS Size = %d\n", wsSize );
-				//TODO: [PROJECT'23.MS2 - #15] [3] PAGE FAULT HANDLER - Placement
-				// Write your code here, remove the panic and write your code
-				//panic("page_fault_handler().PLACEMENT is not implemented yet...!!");
-				 struct FrameInfo *f;
-				 uint32 faulted_page  = allocate_frame(&f);
-				 uint32 v_add = ROUNDDOWN(fault_va, PAGE_SIZE);
-				 uint32 perm = pt_get_page_permissions(curenv->env_page_directory, fault_va);
-				 cprintf("\n fault_va = %x\n",fault_va);
-				 cprintf("\n perm marked=%x\n",(perm & PERM_MARKED));
-
-				 uint32 page = pf_read_env_page(curenv, (void*) fault_va);
-				 if(page != E_PAGE_NOT_EXIST_IN_PF)
+		{
+			//cprintf("PLACEMENT=========================WS Size = %d\n", wsSize );
+			//TODO: [PROJECT'23.MS2 - #15] [3] PAGE FAULT HANDLER - Placement
+			// Write your code here, remove the panic and write your code
+			//panic("page_fault_handler().PLACEMENT is not implemented yet...!!");
+			 struct FrameInfo *f;
+			 uint32 faulted_page  = allocate_frame(&f);
+			 uint32 v_add = ROUNDDOWN(fault_va, PAGE_SIZE);
+			 uint32 perm = pt_get_page_permissions(curenv->env_page_directory, fault_va);
+			 uint32 page = pf_read_env_page(curenv, (void*) fault_va);
+			 if(page != E_PAGE_NOT_EXIST_IN_PF)
+			 {
+				 map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
+				 f->va = v_add;
+			 }
+			 else{
+				 if (((fault_va <= USTACKTOP && fault_va >= USTACKBOTTOM) ||
+					 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START)))
 				 {
-					 cprintf("\n here 1\n");
-					 map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
-					 f->va = v_add;
+						map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
+						f->va = v_add;
+
+				 }else{
+					sched_kill_env(curenv->env_id);
 				 }
-				 else{
-					 if (((fault_va <= USTACKTOP && fault_va >= USTACKBOTTOM) ||
-						 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START)))
-					 {
-						 cprintf("\n here 2\n");
-							map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
-							f->va = v_add;
 
-					 }else{
-
-						 cprintf("\n kill in placement\n");
-						sched_kill_env(curenv->env_id);
-
-					 }
-
-				 }
-				  struct WorkingSetElement* new_element = env_page_ws_list_create_element(curenv,fault_va);
-					if (new_element != NULL) {
-						if (curenv->page_last_WS_element == NULL) {
-							curenv->page_last_WS_element= new_element;
-						} else {
-							curenv->page_last_WS_element->prev_next_info.le_next = new_element;
-							curenv->page_last_WS_element = new_element;
-						}
+			 }
+			  struct WorkingSetElement* new_element = env_page_ws_list_create_element(curenv,fault_va);
+				if (new_element != NULL) {
+					if (curenv->page_last_WS_element == NULL) {
+						curenv->page_last_WS_element= new_element;
+					} else {
+						curenv->page_last_WS_element->prev_next_info.le_next = new_element;
+						curenv->page_last_WS_element = new_element;
+					}
 				}
-					LIST_INSERT_TAIL(&(curenv->page_WS_list), new_element);
-					if (LIST_SIZE(&(curenv->page_WS_list)) == curenv->page_WS_max_size)
-					{
-						curenv->page_last_WS_element = LIST_FIRST(&(curenv->page_WS_list));
-					}
-					else
-					{
-						curenv->page_last_WS_element = NULL;
-					}
-			}
+				LIST_INSERT_TAIL(&(curenv->page_WS_list), new_element);
+				if (LIST_SIZE(&(curenv->page_WS_list)) == curenv->page_WS_max_size)
+				{
+					curenv->page_last_WS_element = LIST_FIRST(&(curenv->page_WS_list));
+				}
+				else
+				{
+					curenv->page_last_WS_element = NULL;
+				}
+		}
 	else
 	{
 		//cprintf("REPLACEMENT=========================WS Size = %d\n", wsSize );
@@ -157,7 +149,6 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 			//TODO: [PROJECT'23.MS3 - BONUS] [1] PAGE FAULT HANDLER - O(1) implementation of LRU replacement
 		}
 	}
-		cprintf("\n outside placement if 1\n");
 }
 
 void __page_fault_handler_with_buffering(struct Env * curenv, uint32 fault_va)
