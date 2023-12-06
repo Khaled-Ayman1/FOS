@@ -59,6 +59,7 @@ enum
 	SYS_get_uhl,
 	SYS_get_alloc_va,
 	SYS_get_free_size,
+	SYS_env_set_nice,
 	//=====================================================================
 	NSYSCALLS
 };

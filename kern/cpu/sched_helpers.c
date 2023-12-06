@@ -8,6 +8,7 @@
 #include <kern/mem/memory_manager.h>
 #include <kern/tests/utilities.h>
 #include <kern/cmd/command_prompt.h>
+#include <inc/fixed_point.h>
 
 //void on_clock_update_WS_time_stamps();
 extern void cleanup_buffers(struct Env* e);
@@ -545,33 +546,28 @@ int64 timer_ticks()
 int env_get_nice(struct Env* e)
 {
 	//TODO: [PROJECT'23.MS3 - #3] [2] BSD SCHEDULER - env_get_nice
-	//Your code is here
-	//Comment the following line
-	panic("Not implemented yet");
-	return 0;
+
+	return e->nice;
 }
 void env_set_nice(struct Env* e, int nice_value)
 {
 	//TODO: [PROJECT'23.MS3 - #3] [2] BSD SCHEDULER - env_set_nice
-	//Your code is here
-	//Comment the following line
-	panic("Not implemented yet");
+
+	e->nice = nice_value;
+
 }
 int env_get_recent_cpu(struct Env* e)
 {
 	//TODO: [PROJECT'23.MS3 - #3] [2] BSD SCHEDULER - env_get_recent_cpu
-	//Your code is here
-	//Comment the following line
-	panic("Not implemented yet");
-	return 0;
+
+	int int_recent_cpu = fix_round(e->recent_cpu);
+	return int_recent_cpu;
 }
 int get_load_average()
 {
 	//TODO: [PROJECT'23.MS3 - #3] [2] BSD SCHEDULER - get_load_average
-	//Your code is here
-	//Comment the following line
-	panic("Not implemented yet");
-	return 0;
+	int integer_load_avg = fix_round(load_avg);
+	return integer_load_avg;
 }
 /********* for BSD Priority Scheduler *************/
 //==================================================================================//

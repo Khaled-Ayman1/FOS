@@ -12,6 +12,7 @@
 #include <kern/trap/trap.h>
 #include <kern/trap/fault_handler.h>
 #include <inc/queue.h>
+#include <inc/fixed_point.h>
 #include <kern/conc/semaphore_manager.h>
 #include "../cmd/command_prompt.h"
 #include "../cpu/sched.h"
@@ -880,6 +881,10 @@ void initialize_environment(struct Env* e, uint32* ptr_user_page_directory, unsi
 	e->nNewPageAdded = 0;
 
 	//e->shared_free_address = USER_SHARED_MEM_START;
+	e->nice = 0;
+	e->recent_cpu = 0;
+    e->priority = PRI_MAX - fix_trunc(e->recent_cpu/fix_int(4)) - (e->nice * 2);
+
 
 	/*2024*/
 	//[PROJECT'23.DONE] call initialize_uheap_dynamic_allocator(...)
