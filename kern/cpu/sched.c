@@ -8,7 +8,7 @@
 #include <kern/mem/memory_manager.h>
 #include <kern/tests/utilities.h>
 #include <kern/cmd/command_prompt.h>
-
+#include <inc/queue.h>
 
 uint32 isSchedMethodRR(){if(scheduler_method == SCH_RR) return 1; return 0;}
 uint32 isSchedMethodMLFQ(){if(scheduler_method == SCH_MLFQ) return 1; return 0;}
@@ -162,16 +162,17 @@ void sched_init_MLFQ(uint8 numOfLevels, uint8 *quantumOfEachLevel)
 void sched_init_BSD(uint8 numOfLevels, uint8 quantum)
 {
 #if USE_KHEAP
+
 	//TODO: [PROJECT'23.MS3 - #4] [2] BSD SCHEDULER - sched_init_BSD
-	//Your code is here
-	//Comment the following line
-	//panic("Not implemented yet");
 
 	num_of_ready_queues = numOfLevels;
 
-	init_queue(env_ready_queues);
+	for(int i = 0; i < num_of_ready_queues; i++){
 
-	kclock_set_quantum(quantum);
+		init_queue(env_ready_queues);
+	}
+	quantums = &quantum;
+	kclock_set_quantum(quantums[0]);
 
 	//=========================================
 	//DON'T CHANGE THESE LINES=================
@@ -189,6 +190,10 @@ void sched_init_BSD(uint8 numOfLevels, uint8 quantum)
 struct Env* fos_scheduler_MLFQ()
 {
 	panic("not implemented");
+
+
+
+
 	return NULL;
 }
 
@@ -200,7 +205,8 @@ struct Env* fos_scheduler_BSD()
 	//TODO: [PROJECT'23.MS3 - #5] [2] BSD SCHEDULER - fos_scheduler_BSD
 	//Your code is here
 	//Comment the following line
-	panic("Not implemented yet");
+	//panic("Not implemented yet");
+
 	return NULL;
 }
 

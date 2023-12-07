@@ -555,19 +555,24 @@ void env_set_nice(struct Env* e, int nice_value)
 
 	e->nice = nice_value;
 
+	fixed_point_t div = fix_div(e->recent_cpu, fix_int(4));
+
+	e->priority = PRI_MAX - fix_trunc(div) - (e->nice * 2);
+
 }
 int env_get_recent_cpu(struct Env* e)
 {
 	//TODO: [PROJECT'23.MS3 - #3] [2] BSD SCHEDULER - env_get_recent_cpu
 
 	int int_recent_cpu = fix_round(e->recent_cpu);
-	return int_recent_cpu;
+	return int_recent_cpu * 100;
 }
 int get_load_average()
 {
 	//TODO: [PROJECT'23.MS3 - #3] [2] BSD SCHEDULER - get_load_average
+
 	int integer_load_avg = fix_round(load_avg);
-	return integer_load_avg;
+	return integer_load_avg * 100;
 }
 /********* for BSD Priority Scheduler *************/
 //==================================================================================//

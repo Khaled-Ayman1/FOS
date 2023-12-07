@@ -10,6 +10,7 @@
 
 LIST_HEAD(Env_Queue, Env);		// Declares 'struct Env_Queue'
 LIST_HEAD(Env_list, Env);		// Declares 'struct Env_list'
+//LIST_HEAD(EnvQueue_List, Env_Queue); //Declare List of MLFQ Queues
 
 /*2023*/
 /********* for BSD Priority Scheduler *************/
