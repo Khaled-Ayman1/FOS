@@ -165,13 +165,19 @@ void sched_init_BSD(uint8 numOfLevels, uint8 quantum)
 
 	//TODO: [PROJECT'23.MS3 - #4] [2] BSD SCHEDULER - sched_init_BSD
 
+	sched_delete_ready_queues();
+
+	quantums = kmalloc(sizeof(uint8));
+	env_ready_queues = kmalloc(sizeof(struct Env_Queue) * num_of_ready_queues);
+
 	num_of_ready_queues = numOfLevels;
+	quantums[0] = quantum;
 
 	for(int i = 0; i < num_of_ready_queues; i++){
 
-		init_queue(env_ready_queues);
+		init_queue(&env_ready_queues[i]);
 	}
-	quantums = &quantum;
+
 	kclock_set_quantum(quantums[0]);
 
 	//=========================================
@@ -190,10 +196,6 @@ void sched_init_BSD(uint8 numOfLevels, uint8 quantum)
 struct Env* fos_scheduler_MLFQ()
 {
 	panic("not implemented");
-
-
-
-
 	return NULL;
 }
 
@@ -203,10 +205,22 @@ struct Env* fos_scheduler_MLFQ()
 struct Env* fos_scheduler_BSD()
 {
 	//TODO: [PROJECT'23.MS3 - #5] [2] BSD SCHEDULER - fos_scheduler_BSD
-	//Your code is here
-	//Comment the following line
 	//panic("Not implemented yet");
 
+	for(int i = 0; i < num_of_ready_queues; i++){
+
+		if(queue_size(&env_ready_queues[i]) != 0){
+
+			return dequeue(&env_ready_queues[i]);
+
+		}
+	}
+	if(queue_size(&env_new_queue) != 0){
+
+		struct Env *run_env = dequeue(&env_new_queue);
+		sched_run_env(run_env->env_id);
+		return dequeue(&env_ready_queues[0]);
+	}
 	return NULL;
 }
 
@@ -217,11 +231,6 @@ struct Env* fos_scheduler_BSD()
 void clock_interrupt_handler()
 {
 	//TODO: [PROJECT'23.MS3 - #5] [2] BSD SCHEDULER - Your code is here
-	{
-
-
-
-	}
 
 
 	/********DON'T CHANGE THIS LINE***********/
