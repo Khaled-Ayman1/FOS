@@ -144,7 +144,188 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 		{
 			//TODO: [PROJECT'23.MS3 - #2] [1] PAGE FAULT HANDLER - LRU Replacement
 			// Write your code here, remove the panic and write your code
-			panic("page_fault_handler() LRU Replacement is not implemented yet...!!");
+			//panic("page_fault_handler() LRU Replacement is not implemented yet...!!");
+			uint32 ALSize = LIST_SIZE(&(curenv->ActiveList));
+			uint32 SLSize = LIST_SIZE(&(curenv->ActiveList));
+			struct FrameInfo* new_frame;
+			if((ALSize + SLSize) < (curenv->page_WS_max_size))//one or both of the lists are not full
+			{
+				//TODO: [PROJECT'23.MS3 - #2] [1] PAGE FAULT HANDLER – LRU Placement
+				if(ALSize < (curenv->ActiveListSize))
+				{
+					//active list empty, add element to it
+					//check if element is in active list
+					struct WorkingSetElement* element_to_find;
+					struct WorkingSetElement* new_element = env_page_ws_list_create_element(curenv,fault_va);
+					int flag = 0;
+					LIST_FOREACH(element_to_find,&(curenv->ActiveList))
+					{
+						if(element_to_find == new_element)
+						{
+							flag = 1;
+							break;
+						}
+					}
+					//element already in list
+					if(flag)
+					{
+						//remove element from the place its is already in then add it at the head
+						if(ALSize > 1)
+						{
+							LIST_REMOVE(&(curenv->ActiveList),new_element);
+							LIST_INSERT_HEAD(&(curenv->ActiveList),new_element);
+						}
+					}else
+					{
+						allocate_frame(&new_frame);
+						map_frame(curenv->env_page_directory,new_frame,fault_va,PERM_WRITEABLE | PERM_USER);
+						LIST_INSERT_HEAD(&(curenv->ActiveList),new_element);
+					}
+
+				}else
+				{
+					//active list is full,add to second list, mark it as NOT PRESENT in second list
+					//check if element is in second list
+					struct WorkingSetElement* element_to_find;
+					struct WorkingSetElement* new_element = env_page_ws_list_create_element(curenv,fault_va);
+					struct WorkingSetElement* pushed_element = LIST_LAST(&(curenv->ActiveList));
+					int flag = 0;
+					LIST_FOREACH(element_to_find,&(curenv->SecondList))
+					{
+						if(element_to_find == new_element)
+						{
+							flag = 1;
+							break;
+						}
+					}
+					//element already in list
+					if(flag)
+					{
+						//remove element from the place its is already in then add it at the head
+						//remove found element from second list
+						LIST_REMOVE(&(curenv->SecondList),new_element);
+
+						//remove last element from active list
+						LIST_REMOVE(&(curenv->ActiveList), pushed_element);
+
+						//insert last element from active list into second list
+						LIST_INSERT_HEAD(&(curenv->SecondList),pushed_element);
+						pt_set_page_permissions(curenv->env_page_directory,pushed_element->virtual_address,0,PERM_PRESENT);
+
+						//insert found element into active list
+						LIST_INSERT_HEAD(&(curenv->ActiveList),new_element);
+						pt_set_page_permissions(curenv->env_page_directory,fault_va,PERM_PRESENT,0);
+					}
+					else //new element
+					{
+						//remove last element in active list
+						LIST_REMOVE(&(curenv->ActiveList), pushed_element);
+
+						//insert the last element in active list in second list
+						LIST_INSERT_HEAD(&(curenv->SecondList),pushed_element);
+						pt_set_page_permissions(curenv->env_page_directory,pushed_element->virtual_address,0,PERM_PRESENT);
+
+						//insert new element in active list
+						allocate_frame(&new_frame);
+						map_frame(curenv->env_page_directory,new_frame,fault_va,PERM_WRITEABLE | PERM_USER);
+						LIST_INSERT_HEAD(&(curenv->ActiveList),new_element);
+					}
+
+
+				}
+
+			}
+			else //both lists are full
+			{
+				//TODO: [PROJECT'23.MS3 - #1] [1] PAGE FAULT HANDLER - LRU Replacement
+				struct WorkingSetElement* element_to_find;
+				struct WorkingSetElement* new_element = env_page_ws_list_create_element(curenv,fault_va);
+				struct WorkingSetElement* pushed_element = LIST_LAST(&(curenv->ActiveList));
+				int flagAL = 0;
+				int flagSL = 0;
+
+				//check if element in active list
+				LIST_FOREACH(element_to_find,&(curenv->ActiveList))
+				{
+					if(element_to_find == new_element)
+					{
+						flagAL = 1;
+						break;
+					}
+				}
+				//element already in list
+				if(flagAL)
+				{
+					//remove element from the place its is already in then add it at the head
+					if(ALSize > 1)
+					{
+						LIST_REMOVE(&(curenv->ActiveList),new_element);
+						LIST_INSERT_HEAD(&(curenv->ActiveList),new_element);
+					}
+				}
+
+				//check if element in second list
+				if(flagAL == 0)
+				{
+					LIST_FOREACH(element_to_find,&(curenv->SecondList))
+					{
+						if(element_to_find == new_element)
+						{
+							flagSL = 1;
+							break;
+						}
+					}
+					//element already in list
+					if(flagSL)
+					{
+						//remove element from the place its is already in then add it at the head
+						//remove found element from second list
+						LIST_REMOVE(&(curenv->SecondList),new_element);
+
+						//remove last element from active list
+						LIST_REMOVE(&(curenv->ActiveList), pushed_element);
+
+						//insert last element from active list into second list
+						LIST_INSERT_HEAD(&(curenv->SecondList),pushed_element);
+						pt_set_page_permissions(curenv->env_page_directory,pushed_element->virtual_address,0,PERM_PRESENT);
+
+						//insert found element into active list
+						LIST_INSERT_HEAD(&(curenv->ActiveList),new_element);
+						pt_set_page_permissions(curenv->env_page_directory,fault_va,PERM_PRESENT,0);
+					}
+					else //new element added
+					{
+						//have to eliminate last element in second list and do the replacement
+						struct WorkingSetElement* element_to_eliminate = LIST_LAST(&(curenv->SecondList));
+						uint32 perm = pt_get_page_permissions(curenv->env_page_directory,pushed_element->virtual_address);
+						if(perm & PERM_MODIFIED){
+							/*
+							 * disk writing missing
+							 *
+							 */
+							uint32* ptr_page_table = NULL;
+							struct FrameInfo* ptr_frame_info = get_frame_info(curenv->env_page_directory,element_to_eliminate->virtual_address,&ptr_page_table);
+							pf_update_env_page(curenv,element_to_eliminate->virtual_address,ptr_frame_info);
+						}
+						LIST_REMOVE(&(curenv->SecondList),element_to_eliminate);
+
+						//remove last element in active list
+						LIST_REMOVE(&(curenv->SecondList),pushed_element);
+
+						//add last element in active list into second list
+						LIST_INSERT_HEAD(&(curenv->SecondList),pushed_element);
+						pt_set_page_permissions(curenv->env_page_directory,pushed_element->virtual_address,0,PERM_PRESENT);
+
+						//add new element into active list
+						allocate_frame(&new_frame);
+						map_frame(curenv->env_page_directory,new_frame,fault_va,PERM_WRITEABLE | PERM_USER);
+						LIST_INSERT_HEAD(&(curenv->ActiveList),new_element);
+					}
+
+				}
+
+
+			}
 
 			//TODO: [PROJECT'23.MS3 - BONUS] [1] PAGE FAULT HANDLER - O(1) implementation of LRU replacement
 		}
