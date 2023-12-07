@@ -147,6 +147,7 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 			//panic("page_fault_handler() LRU Replacement is not implemented yet...!!");
 			uint32 ALSize = LIST_SIZE(&(curenv->ActiveList));
 			uint32 SLSize = LIST_SIZE(&(curenv->ActiveList));
+			struct FrameInfo* new_frame;
 			if((ALSize + SLSize) < (curenv->page_WS_max_size))//one or both of the lists are not full
 			{
 				//TODO: [PROJECT'23.MS3 - #2] [1] PAGE FAULT HANDLER – LRU Placement
@@ -172,9 +173,14 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 						if(ALSize > 1)
 						{
 							LIST_REMOVE(&(curenv->ActiveList),new_element);
+							LIST_INSERT_HEAD(&(curenv->ActiveList),new_element);
 						}
+					}else
+					{
+						allocate_frame(&new_frame);
+						map_frame(curenv->env_page_directory,new_frame,fault_va,PERM_WRITEABLE | PERM_USER);
+						LIST_INSERT_HEAD(&(curenv->ActiveList),new_element);
 					}
-					LIST_INSERT_HEAD(&(curenv->ActiveList),new_element);
 
 				}else
 				{
@@ -220,6 +226,8 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 						pt_set_page_permissions(curenv->env_page_directory,pushed_element->virtual_address,0,PERM_PRESENT);
 
 						//insert new element in active list
+						allocate_frame(&new_frame);
+						map_frame(curenv->env_page_directory,new_frame,fault_va,PERM_WRITEABLE | PERM_USER);
 						LIST_INSERT_HEAD(&(curenv->ActiveList),new_element);
 					}
 
@@ -296,16 +304,21 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 							 *
 							 */
 							uint32* ptr_page_table = NULL;
-							struct FrameInfo* ptr_frame_info = get_frame_info(curenv->env_page_directory,pushed_element->virtual_address,&ptr_page_table);
-							pf_update_env_page(curenv,pushed_element->virtual_address,ptr_frame_info);
+							struct FrameInfo* ptr_frame_info = get_frame_info(curenv->env_page_directory,element_to_eliminate->virtual_address,&ptr_page_table);
+							pf_update_env_page(curenv,element_to_eliminate->virtual_address,ptr_frame_info);
 						}
 						LIST_REMOVE(&(curenv->SecondList),element_to_eliminate);
+
+						//remove last element in active list
+						LIST_REMOVE(&(curenv->SecondList),pushed_element);
 
 						//add last element in active list into second list
 						LIST_INSERT_HEAD(&(curenv->SecondList),pushed_element);
 						pt_set_page_permissions(curenv->env_page_directory,pushed_element->virtual_address,0,PERM_PRESENT);
 
 						//add new element into active list
+						allocate_frame(&new_frame);
+						map_frame(curenv->env_page_directory,new_frame,fault_va,PERM_WRITEABLE | PERM_USER);
 						LIST_INSERT_HEAD(&(curenv->ActiveList),new_element);
 					}
 
