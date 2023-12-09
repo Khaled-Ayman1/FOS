@@ -86,12 +86,67 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 	
 		//cprintf("REPLACEMENT=========================WS Size = %d\n", wsSize );
 		//refer to the project presentation and documentation for details
-		if(isPageReplacmentAlgorithmFIFO())
+			if(isPageReplacmentAlgorithmFIFO())
+	{
+		//placement from MS2 [heavily modified for FIFO]
+
+		if(wsSize < (curenv->page_WS_max_size))
 		{
-			//TODO: [PROJECT'23.MS3 - #1] [1] PAGE FAULT HANDLER - FIFO Replacement
-			// Write your code here, remove the panic and write your code
-			panic("page_fault_handler() FIFO Replacement is not implemented yet...!!");
+			//TODO: [PROJECT'23.MS2 - #15] [3] PAGE FAULT HANDLER - Placement
+
+			placement(curenv, fault_va);
+
 		}
+
+
+		//replacement, MS3
+		else {
+
+			//TODO: [PROJECT'23.MS3 - #1] [1] PAGE FAULT HANDLER - FIFO Replacement
+
+			struct WorkingSetElement* element;
+			int found = 0;
+			LIST_FOREACH(element, &curenv->page_WS_list) {
+				if (ROUNDDOWN(element->virtual_address, PAGE_SIZE) == ROUNDDOWN(fault_va, PAGE_SIZE)) {
+					found = 1;
+					break;
+				}
+			}
+
+			if (!found) {
+
+				//remove victim, unmap it and remove from list and write it to disk
+				uint32 *ptr_page_table = NULL;
+				struct WorkingSetElement* victim = curenv->page_last_WS_element;
+				uint32 victim_perm = pt_get_page_permissions(curenv->env_page_directory, ROUNDDOWN(victim->virtual_address, PAGE_SIZE));
+				struct FrameInfo* victim_frame = get_frame_info(curenv->env_page_directory, ROUNDDOWN(victim->virtual_address, PAGE_SIZE), &ptr_page_table);
+
+				//if modified, write to disk
+				if ((victim_perm & PERM_MODIFIED) == PERM_MODIFIED) {
+					int ret = pf_update_env_page(curenv, ROUNDDOWN(victim->virtual_address, PAGE_SIZE), victim_frame);
+					if (ret == E_NO_PAGE_FILE_SPACE)
+						panic("ERROR: No enough virtual space on the page file");
+				}
+
+				if (curenv->page_last_WS_element == victim)
+				{
+					curenv->page_last_WS_element = LIST_NEXT(victim);
+				}
+
+				//unmap victim and remove it from list
+				unmap_frame(curenv->env_page_directory, ROUNDDOWN(victim->virtual_address,PAGE_SIZE));
+
+				LIST_REMOVE(&(curenv->page_WS_list), victim);
+
+
+
+				placement(curenv, fault_va);
+
+
+			}
+
+		}
+	}
 		if(isPageReplacmentAlgorithmLRU(PG_REP_LRU_LISTS_APPROX))
 		{
 			//TODO: [PROJECT'23.MS3 - #2] [1] PAGE FAULT HANDLER - LRU Replacement
