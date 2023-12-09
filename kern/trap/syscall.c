@@ -593,6 +593,7 @@ void* sys_sbrk(int increment)
 		env->ubreak += increment;
 		numOfPages *= -1;
 
+		uint32 perm;
 		for(int i = 0;i<numOfPages;i++)
 		{
 			exStart -= PAGE_SIZE;
@@ -600,14 +601,81 @@ void* sys_sbrk(int increment)
 			get_page_table(env->env_page_directory, exStart, &ptr_page_table);
 			ptr_frame_info = get_frame_info(env->env_page_directory,exStart,&ptr_page_table);
 
+			perm = pt_get_page_permissions(curenv->env_page_directory,exStart);
+
+			if((perm & PERM_PRESENT) == 0){
+				continue;
+			}
+
+			//remove it from the fifo list page_WS_list
+			if(isPageReplacmentAlgorithmFIFO() && env->page_last_WS_element != NULL) {
+				struct WorkingSetElement* element;
+				LIST_FOREACH(element, &(env->page_WS_list)) {
+					if (ROUNDDOWN(element->virtual_address, PAGE_SIZE) == ROUNDDOWN(exStart, PAGE_SIZE))
+						break;
+				}
+				if (element != NULL) {
+					//make sure that the element about to be removed wasn't the page_last_WS_element
+					//if it was, make the page_last_WS_element the one after it
+					//if the one after it was NULL then the adjust piece of code below will still perform as expected
+					if (element->virtual_address == env->page_last_WS_element->virtual_address)
+						env->page_last_WS_element = LIST_NEXT(element);
+
+					LIST_REMOVE(&(env->page_WS_list), element);
+				}
+			}
+
+
+			//important, check that it exists and has a page table before freeing
+			//note that it could be in the page_WS_list but doesn't have a page table
+			//so removing it from list first then checking is the correct approach
+			//discovered in FIFO test "run tffo2 11"
+			uint32* ptr_page_table ;
+			int ret = get_page_table(curenv->env_page_directory, exStart, &ptr_page_table);
+			if (ptr_page_table == NULL) {
+				continue;
+			}
+
+
 			pt_set_page_permissions(env->env_page_directory, exStart, 0,PERM_WRITEABLE | PERM_MARKED);
 
 			if(ptr_frame_info == 0)
 				continue;
+			env_page_ws_invalidate(env, exStart);
+
+			pf_remove_env_page(env, exStart);
 
 			unmap_frame(env->env_page_directory,exStart);
 
+			pt_clear_page_table_entry(env->env_page_directory, exStart);
+
+
 		}
+
+		//adjust the page_WS_list in FIFO
+		if(isPageReplacmentAlgorithmFIFO() && env->page_last_WS_element != NULL) {
+
+			struct WorkingSetElement* curr_element;
+			if (env->page_last_WS_element != NULL) {
+
+				//re-sort the FIFO, make the page_last_WS_element as the head with the others following it
+				//example: {a,b,c,d,NULL} if c is the head then the result should be {c,d,a,b,NULL}
+				//then c is no longer marked as page_last_WS_element, as the list is not full and so that placement (if any) can place at the tail
+				LIST_FOREACH(curr_element, &(env->page_WS_list)) {
+					if (curr_element->virtual_address == env->page_last_WS_element->virtual_address)
+						break;
+
+					struct WorkingSetElement* new_element = curr_element;
+					LIST_REMOVE(&(env->page_WS_list), curr_element);
+					LIST_INSERT_TAIL(&(env->page_WS_list), new_element);
+				}
+			}
+
+			env->page_last_WS_element = NULL;
+
+		}
+
+
 		return (void*)env->ubreak;
 	}
 	else

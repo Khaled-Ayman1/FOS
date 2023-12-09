@@ -57,6 +57,7 @@ uint32 getModifiedBufferLength() { return _ModifiedBufferLength;}
 //Handle the table fault
 void table_fault_handler(struct Env * curenv, uint32 fault_va)
 {
+
 	//panic("table_fault_handler() is not implemented yet...!!");
 	//Check if it's a stack page
 	uint32* ptr_table;
@@ -75,6 +76,7 @@ void table_fault_handler(struct Env * curenv, uint32 fault_va)
 
 void page_fault_handler(struct Env * curenv, uint32 fault_va)
 {
+	fault_va = ROUNDDOWN(fault_va, PAGE_SIZE);
 #if USE_KHEAP
 		struct WorkingSetElement *victimWSElement = NULL;
 		uint32 wsSize = LIST_SIZE(&(curenv->page_WS_list));
@@ -83,72 +85,78 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 		uint32 wsSize = env_page_ws_get_size(curenv);
 #endif
 
+
+	if(isPageReplacmentAlgorithmFIFO())
+	{
+		//placement from MS2 [heavily modified for FIFO]
+
 		if(wsSize < (curenv->page_WS_max_size))
 		{
-			//cprintf("PLACEMENT=========================WS Size = %d\n", wsSize );
 			//TODO: [PROJECT'23.MS2 - #15] [3] PAGE FAULT HANDLER - Placement
-			// Write your code here, remove the panic and write your code
-			//panic("page_fault_handler().PLACEMENT is not implemented yet...!!");
-			 struct FrameInfo *f;
-			 uint32 faulted_page  = allocate_frame(&f);
-			 uint32 v_add = ROUNDDOWN(fault_va, PAGE_SIZE);
-			 uint32 perm = pt_get_page_permissions(curenv->env_page_directory, fault_va);
-			 uint32 page = pf_read_env_page(curenv, (void*) fault_va);
-			 if(page != E_PAGE_NOT_EXIST_IN_PF)
-			 {
-				 map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
-				 f->va = v_add;
-			 }
-			 else{
-				 if (((fault_va <= USTACKTOP && fault_va >= USTACKBOTTOM) ||
-					 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START)))
-				 {
-						map_frame(curenv->env_page_directory, f, v_add, PERM_WRITEABLE | PERM_USER);
-						f->va = v_add;
 
-				 }else{
-					sched_kill_env(curenv->env_id);
-				 }
+			placement(curenv, fault_va);
 
-			 }
-			  struct WorkingSetElement* new_element = env_page_ws_list_create_element(curenv,fault_va);
-				if (new_element != NULL) {
-					if (curenv->page_last_WS_element == NULL) {
-						curenv->page_last_WS_element= new_element;
-					} else {
-						curenv->page_last_WS_element->prev_next_info.le_next = new_element;
-						curenv->page_last_WS_element = new_element;
-					}
-				}
-				LIST_INSERT_TAIL(&(curenv->page_WS_list), new_element);
-				if (LIST_SIZE(&(curenv->page_WS_list)) == curenv->page_WS_max_size)
-				{
-					curenv->page_last_WS_element = LIST_FIRST(&(curenv->page_WS_list));
-				}
-				else
-				{
-					curenv->page_last_WS_element = NULL;
-				}
 		}
-	else
-	{
-		//cprintf("REPLACEMENT=========================WS Size = %d\n", wsSize );
-		//refer to the project presentation and documentation for details
-		if(isPageReplacmentAlgorithmFIFO())
-		{
+
+
+		//replacement, MS3
+		else {
+
 			//TODO: [PROJECT'23.MS3 - #1] [1] PAGE FAULT HANDLER - FIFO Replacement
-			// Write your code here, remove the panic and write your code
-			panic("page_fault_handler() FIFO Replacement is not implemented yet...!!");
-		}
-		if(isPageReplacmentAlgorithmLRU(PG_REP_LRU_LISTS_APPROX))
-		{
-			//TODO: [PROJECT'23.MS3 - #2] [1] PAGE FAULT HANDLER - LRU Replacement
-			// Write your code here, remove the panic and write your code
-			panic("page_fault_handler() LRU Replacement is not implemented yet...!!");
 
-			//TODO: [PROJECT'23.MS3 - BONUS] [1] PAGE FAULT HANDLER - O(1) implementation of LRU replacement
+			struct WorkingSetElement* element;
+			int found = 0;
+			LIST_FOREACH(element, &curenv->page_WS_list) {
+				if (ROUNDDOWN(element->virtual_address, PAGE_SIZE) == ROUNDDOWN(fault_va, PAGE_SIZE)) {
+					found = 1;
+					break;
+				}
+			}
+
+			if (!found) {
+
+				//remove victim, unmap it and remove from list and write it to disk
+				uint32 *ptr_page_table = NULL;
+				struct WorkingSetElement* victim = curenv->page_last_WS_element;
+				uint32 victim_perm = pt_get_page_permissions(curenv->env_page_directory, ROUNDDOWN(victim->virtual_address, PAGE_SIZE));
+				struct FrameInfo* victim_frame = get_frame_info(curenv->env_page_directory, ROUNDDOWN(victim->virtual_address, PAGE_SIZE), &ptr_page_table);
+
+				//if modified, write to disk
+				if ((victim_perm & PERM_MODIFIED) == PERM_MODIFIED) {
+					int ret = pf_update_env_page(curenv, ROUNDDOWN(victim->virtual_address, PAGE_SIZE), victim_frame);
+					if (ret == E_NO_PAGE_FILE_SPACE)
+						panic("ERROR: No enough virtual space on the page file");
+				}
+
+				if (curenv->page_last_WS_element == victim)
+				{
+					curenv->page_last_WS_element = LIST_NEXT(victim);
+				}
+
+				//unmap victim and remove it from list
+				unmap_frame(curenv->env_page_directory, ROUNDDOWN(victim->virtual_address,PAGE_SIZE));
+
+				LIST_REMOVE(&(curenv->page_WS_list), victim);
+
+
+
+				placement(curenv, fault_va);
+
+
+			}
+
 		}
 	}
+
+	if(isPageReplacmentAlgorithmLRU(PG_REP_LRU_LISTS_APPROX))
+	{
+		//TODO: [PROJECT'23.MS3 - #2] [1] PAGE FAULT HANDLER - LRU Replacement
+		// Write your code here, remove the panic and write your code
+		//panic("page_fault_handler() LRU Replacement is not implemented yet...!!");
+
+		//TODO: [PROJECT'23.MS3 - BONUS] [1] PAGE FAULT HANDLER - O(1) implementation of LRU replacement
+	}
+
 }
 
 void __page_fault_handler_with_buffering(struct Env * curenv, uint32 fault_va)
@@ -156,5 +164,71 @@ void __page_fault_handler_with_buffering(struct Env * curenv, uint32 fault_va)
 	panic("this function is not required...!!");
 }
 
+
+
+void placement(struct Env * curenv, uint32 fault_va) {
+
+
+	struct WorkingSetElement *victimWSElement = NULL;
+	uint32 wsSize = LIST_SIZE(&(curenv->page_WS_list));
+
+	//cprintf("PLACEMENT=========================WS Size = %d\n", wsSize );
+
+
+	struct WorkingSetElement* element;
+	int found = 0;
+	LIST_FOREACH(element, &curenv->page_WS_list) {
+		if (ROUNDDOWN(element->virtual_address, PAGE_SIZE) == ROUNDDOWN(fault_va, PAGE_SIZE)) {
+			found = 1;
+			break;
+		}
+	}
+
+	//if not found then insert it, don't put repititions because this is FIFO
+	if (!found) {
+
+		//allocate the new one
+		struct FrameInfo *newFrame;
+		uint32 fret  = allocate_frame(&newFrame);
+		map_frame(curenv->env_page_directory, newFrame, fault_va, PERM_WRITEABLE | PERM_USER);
+		newFrame->va = fault_va;
+
+		uint32 page_from_disk = pf_read_env_page(curenv, (void*)fault_va);
+		//if it is not found in disk, then make sure it exists within user stack and heap
+		 if(page_from_disk == E_PAGE_NOT_EXIST_IN_PF) {
+			 if (!(((fault_va <= USTACKTOP && fault_va >= USTACKBOTTOM) ||
+				 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START)))) {
+					sched_kill_env(curenv->env_id);
+			 }
+		}
+
+
+		//new element to insert to list
+		struct WorkingSetElement* new_element = env_page_ws_list_create_element(curenv,fault_va);
+
+
+		if (curenv->page_last_WS_element == NULL) {
+			LIST_INSERT_TAIL(&(curenv->page_WS_list), new_element);
+
+			//after insertion, update last elem
+			//maybe list became full now and maybe not, if not full leave page_last_WS_element as NULL
+			//if it just became full (wasn't at replacement before this) then make page_last_WS_element point back to first element
+			if (LIST_SIZE(&(curenv->page_WS_list)) == (curenv->page_WS_max_size)) {
+				curenv->page_last_WS_element = LIST_FIRST(&(curenv->page_WS_list));
+			}
+
+		}
+
+		//coming from replacement because last isn't null
+		//replacement already updates last element so no need to do it
+		else {
+			LIST_INSERT_BEFORE(&(curenv->page_WS_list), curenv->page_last_WS_element, new_element);
+		}
+
+
+	}
+
+
+}
 
 
