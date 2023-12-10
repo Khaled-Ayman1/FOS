@@ -55,6 +55,8 @@ uint32 old_pf_counter;
 //uint32 mydblchk;
 struct WorkingSetElement {
 	unsigned int virtual_address;
+	//used in lru O(1), 0 -> active list, 1 -> second list
+	int currentList;
 	uint8 empty;
 	//2012
 	unsigned int time_stamp ;
