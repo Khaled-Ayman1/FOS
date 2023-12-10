@@ -165,13 +165,21 @@ void sched_init_BSD(uint8 numOfLevels, uint8 quantum)
 
 	//TODO: [PROJECT'23.MS3 - #4] [2] BSD SCHEDULER - sched_init_BSD
 
+	sched_delete_ready_queues();
+
+	quantums = kmalloc(sizeof(uint8));
+	env_ready_queues = kmalloc(sizeof(struct Env_Queue) * num_of_ready_queues);
+
+	load_avg = fix_int(0);
+	num_of_ready_processes = 0;
 	num_of_ready_queues = numOfLevels;
+	quantums[0] = quantum;
 
 	for(int i = 0; i < num_of_ready_queues; i++){
 
-		init_queue(env_ready_queues);
+		init_queue(&env_ready_queues[i]);
 	}
-	quantums = &quantum;
+
 	kclock_set_quantum(quantums[0]);
 
 	//=========================================
@@ -190,10 +198,6 @@ void sched_init_BSD(uint8 numOfLevels, uint8 quantum)
 struct Env* fos_scheduler_MLFQ()
 {
 	panic("not implemented");
-
-
-
-
 	return NULL;
 }
 
@@ -203,10 +207,25 @@ struct Env* fos_scheduler_MLFQ()
 struct Env* fos_scheduler_BSD()
 {
 	//TODO: [PROJECT'23.MS3 - #5] [2] BSD SCHEDULER - fos_scheduler_BSD
-	//Your code is here
-	//Comment the following line
 	//panic("Not implemented yet");
 
+	for(int i = 0; i < num_of_ready_queues; i++)
+		num_of_ready_processes += queue_size(&env_ready_queues[i]);
+
+	for(int i = 0; i < num_of_ready_queues; i++){
+
+		if(queue_size(&env_ready_queues[i]) != 0){
+
+			return dequeue(&env_ready_queues[i]);
+
+		}
+	}
+	if(queue_size(&env_new_queue) != 0){
+
+		struct Env *run_env = dequeue(&env_new_queue);
+		sched_run_env(run_env->env_id);
+		return dequeue(&env_ready_queues[0]);
+	}
 	return NULL;
 }
 
@@ -217,10 +236,44 @@ struct Env* fos_scheduler_BSD()
 void clock_interrupt_handler()
 {
 	//TODO: [PROJECT'23.MS3 - #5] [2] BSD SCHEDULER - Your code is here
-	{
 
 
+	if (((timer_ticks() * quantums[0]) % 1000) <= quantums[0] - 1){
 
+		load_avg = fix_add(fix_mul(fix_frac(59,60),load_avg), fix_mul(fix_frac(1,60),fix_int(num_of_ready_processes)));
+
+		for(int i = 0; i < sizeof(envs) / sizeof(struct Env *); i++){
+
+			fixed_point_t a = fix_div(fix_scale(load_avg, 2), fix_add(fix_scale(load_avg, 2), fix_int(1)));
+
+			envs[i].recent_cpu = fix_add(fix_mul(a, envs[i].recent_cpu), fix_int(envs[i].nice));
+
+		}
+	}
+	if(timer_ticks() % 4 == 0){
+
+		for(int i = 0; i < sizeof(envs) / sizeof(struct Env *); i++){
+
+			fixed_point_t div = fix_div(envs[i].recent_cpu, fix_int(4));
+			envs[i].priority = PRI_MAX - fix_trunc(div) - (envs[i].nice * 2);
+
+			if(envs[i].priority > PRI_MAX || envs[i].priority < PRI_MAX)
+				cprintf("\nInvalid priority out of bounds: %d\n", envs[i].priority);
+
+			if(envs[i].env_status == ENV_READY){
+
+				sched_remove_ready(&envs[i]);
+				enqueue(&env_ready_queues[PRI_MAX - envs[i].priority], &envs[i]);
+				envs[i].env_status = ENV_READY;
+			}
+		}
+
+	}
+
+	for(int i = 0; i < sizeof(envs) / sizeof(struct Env *); i++){
+
+		if(envs[i].env_status == ENV_RUNNABLE)
+			envs[i].recent_cpu = fix_add(envs[i].recent_cpu, fix_int(1));
 	}
 
 
