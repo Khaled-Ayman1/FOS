@@ -167,20 +167,18 @@ void sched_init_BSD(uint8 numOfLevels, uint8 quantum)
 
 	sched_delete_ready_queues();
 
-	quantums = kmalloc(sizeof(uint8));
-	env_ready_queues = kmalloc(sizeof(struct Env_Queue) * num_of_ready_queues);
-
-	load_avg = fix_int(0);
-	num_of_ready_processes = 0;
 	num_of_ready_queues = numOfLevels;
+	num_of_ready_processes = 0;
+	load_avg = fix_int(0);
 	quantums[0] = quantum;
 
-	for(int i = 0; i < num_of_ready_queues; i++){
-
-		init_queue(&env_ready_queues[i]);
-	}
+	env_ready_queues = kmalloc(sizeof(struct Env_Queue) * num_of_ready_queues);
 
 	kclock_set_quantum(quantums[0]);
+
+	for(int i = 0; i < num_of_ready_queues; i++)
+
+		init_queue(&env_ready_queues[i]);
 
 	//=========================================
 	//DON'T CHANGE THESE LINES=================
@@ -209,21 +207,40 @@ struct Env* fos_scheduler_BSD()
 	//TODO: [PROJECT'23.MS3 - #5] [2] BSD SCHEDULER - fos_scheduler_BSD
 	//panic("Not implemented yet");
 
+	if(curenv != NULL){
+
+		uint32  div = ROUNDUP((PRI_MAX/num_of_ready_queues), 1);
+		uint32 index = ROUNDDOWN((PRI_MAX - curenv->priority)/div, 1);
+
+		if(index > num_of_ready_queues - 1)
+			index = num_of_ready_queues - 1;
+
+		cprintf("\nWill Place at Q#%d\n", index);
+		enqueue(&env_ready_queues[index], curenv);
+		curenv->env_status = ENV_READY;
+	}
+
 	for(int i = 0; i < num_of_ready_queues; i++)
 		num_of_ready_processes += queue_size(&env_ready_queues[i]);
 
 	for(int i = 0; i < num_of_ready_queues; i++){
 
 		if(queue_size(&env_ready_queues[i]) != 0){
+			cprintf("\nIn READY Q#%d\n", i);
+
+			sched_print_all();
 
 			return dequeue(&env_ready_queues[i]);
 
 		}
 	}
 	if(queue_size(&env_new_queue) != 0){
-
+		cprintf("\nIn NEW\n");
 		struct Env *run_env = dequeue(&env_new_queue);
 		sched_run_env(run_env->env_id);
+
+		sched_print_all();
+
 		return dequeue(&env_ready_queues[0]);
 	}
 	return NULL;
@@ -242,35 +259,59 @@ void clock_interrupt_handler()
 
 		load_avg = fix_add(fix_mul(fix_frac(59,60),load_avg), fix_mul(fix_frac(1,60),fix_int(num_of_ready_processes)));
 
+		cprintf("\nload:%d\n", fix_round(load_avg));
+
 		for(int i = 0; i < sizeof(envs) / sizeof(struct Env *); i++){
 
 			fixed_point_t a = fix_div(fix_scale(load_avg, 2), fix_add(fix_scale(load_avg, 2), fix_int(1)));
 
 			envs[i].recent_cpu = fix_add(fix_mul(a, envs[i].recent_cpu), fix_int(envs[i].nice));
 
+			cprintf("\nrecent_cpu:%d", fix_round(envs[i].recent_cpu));
 		}
 	}
 	if(timer_ticks() % 4 == 0){
 
+		fixed_point_t div;
+		uint32 old_priority;
 		for(int i = 0; i < sizeof(envs) / sizeof(struct Env *); i++){
 
-			fixed_point_t div = fix_div(envs[i].recent_cpu, fix_int(4));
-			envs[i].priority = PRI_MAX - fix_trunc(div) - (envs[i].nice * 2);
+			old_priority = envs[i].priority;
 
-			if(envs[i].priority > PRI_MAX || envs[i].priority < PRI_MAX)
-				cprintf("\nInvalid priority out of bounds: %d\n", envs[i].priority);
+			div = fix_div(envs[i].recent_cpu, fix_int(4));
+			uint32 calc_pri = PRI_MAX - fix_trunc(div) - (envs[i].nice * 2);
 
-			if(envs[i].env_status == ENV_READY){
+			if(calc_pri > PRI_MAX)
+				envs[i].priority = PRI_MAX;
+
+				else if(calc_pri < PRI_MIN)
+					envs[i].priority = PRI_MIN;
+
+				else
+					envs[i].priority = calc_pri;
+
+				cprintf("\nCLOCK INTERRUPT -> Priority: %d\n", envs[i].priority);
+
+			if(envs[i].env_status == ENV_READY && envs[i].priority != old_priority){
+
+				uint32  div = ROUNDUP((PRI_MAX/num_of_ready_queues), 1);
+				uint32 index = ROUNDDOWN((PRI_MAX - envs[i].priority)/div, 1);
+
+				if(index > num_of_ready_queues - 1)
+						index = num_of_ready_queues - 1;
 
 				sched_remove_ready(&envs[i]);
-				enqueue(&env_ready_queues[PRI_MAX - envs[i].priority], &envs[i]);
+				enqueue(&env_ready_queues[index], &envs[i]);
 				envs[i].env_status = ENV_READY;
+
 			}
 		}
 
 	}
 
-	for(int i = 0; i < sizeof(envs) / sizeof(struct Env *); i++){
+	for(int i = 0; i < (sizeof(envs) / sizeof(struct Env *)); i++){
+
+		cprintf("environment: %d", envs[i].env_id);
 
 		if(envs[i].env_status == ENV_RUNNABLE)
 			envs[i].recent_cpu = fix_add(envs[i].recent_cpu, fix_int(1));

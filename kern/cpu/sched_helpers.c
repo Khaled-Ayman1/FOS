@@ -559,8 +559,18 @@ void env_set_nice(struct Env* e, int nice_value)
 	e->nice = nice_value;
 
 	fixed_point_t div = fix_div(e->recent_cpu, fix_int(4));
+	uint32 calc_pri = PRI_MAX - fix_trunc(div) - (e->nice * 2);
 
-	e->priority = PRI_MAX - fix_trunc(div) - (e->nice * 2);
+	if(calc_pri > PRI_MAX)
+		e->priority = PRI_MAX;
+
+	else if(calc_pri < PRI_MIN)
+		e->priority = PRI_MIN;
+
+	else
+		e->priority = calc_pri;
+
+	cprintf("\nNICE CHANGED - > Priority: %d\n", e->priority);
 
 }
 int env_get_recent_cpu(struct Env* e)

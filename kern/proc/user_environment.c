@@ -324,6 +324,7 @@ struct Env* env_create(char* user_program_name, unsigned int page_WS_size, unsig
 		//now add it to the working set and the page table
 		{
 #if USE_KHEAP
+
 			wse = env_page_ws_list_create_element(e, (uint32) stackVa);
 			LIST_INSERT_TAIL(&(e->page_WS_list), wse);
 			if (LIST_SIZE(&(e->page_WS_list)) == e->page_WS_max_size)
@@ -887,7 +888,6 @@ void initialize_environment(struct Env* e, uint32* ptr_user_page_directory, unsi
 	fixed_point_t div = fix_div(e->recent_cpu, fix_int(4));
 
     e->priority = PRI_MAX - fix_trunc(div) - (e->nice * 2);
-
 
 	/*2024*/
 	//[PROJECT'23.DONE] call initialize_uheap_dynamic_allocator(...)
