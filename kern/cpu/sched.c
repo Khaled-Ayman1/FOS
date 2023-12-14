@@ -168,11 +168,13 @@ void sched_init_BSD(uint8 numOfLevels, uint8 quantum)
 	sched_delete_ready_queues();
 
 	num_of_ready_queues = numOfLevels;
-	num_of_ready_processes = 0;
 	load_avg = fix_int(0);
-	quantums[0] = quantum;
+	ticks = 0;
 
+	quantums = kmalloc(sizeof(uint8));
 	env_ready_queues = kmalloc(sizeof(struct Env_Queue) * num_of_ready_queues);
+
+	quantums[0] = quantum;
 
 	kclock_set_quantum(quantums[0]);
 
@@ -220,6 +222,7 @@ struct Env* fos_scheduler_BSD()
 		curenv->env_status = ENV_READY;
 	}
 
+	num_of_ready_processes = 0;
 	for(int i = 0; i < num_of_ready_queues; i++)
 		num_of_ready_processes += queue_size(&env_ready_queues[i]);
 
@@ -230,19 +233,16 @@ struct Env* fos_scheduler_BSD()
 
 			sched_print_all();
 
+			//next line causes infinite kernel trap loop since quantum is 0
+			kclock_set_quantum(quantums[0]);
+			//-------------------------------------------------------------//
+
 			return dequeue(&env_ready_queues[i]);
 
 		}
 	}
-	if(queue_size(&env_new_queue) != 0){
-		cprintf("\nIn NEW\n");
-		struct Env *run_env = dequeue(&env_new_queue);
-		sched_run_env(run_env->env_id);
 
-		sched_print_all();
-
-		return dequeue(&env_ready_queues[0]);
-	}
+	load_avg = fix_int(0);
 	return NULL;
 }
 
@@ -254,7 +254,8 @@ void clock_interrupt_handler()
 {
 	//TODO: [PROJECT'23.MS3 - #5] [2] BSD SCHEDULER - Your code is here
 
-
+	cprintf("\nTicks: %d\nQuantum: %d\n", timer_ticks() , quantums[0]);
+	//Equation always yields 0
 	if (((timer_ticks() * quantums[0]) % 1000) <= quantums[0] - 1){
 
 		load_avg = fix_add(fix_mul(fix_frac(59,60),load_avg), fix_mul(fix_frac(1,60),fix_int(num_of_ready_processes)));
