@@ -162,29 +162,8 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 		}
 
 
-		//remove it from the fifo list page_WS_list
-		if(isPageReplacmentAlgorithmFIFO() && e->page_last_WS_element != NULL) {
-			struct WorkingSetElement* element;
-			LIST_FOREACH(element, &(e->page_WS_list)) {
-				if (ROUNDDOWN(element->virtual_address, PAGE_SIZE) == ROUNDDOWN(pagePtr, PAGE_SIZE))
-					break;
-			}
-			if (element != NULL) {
-				//make sure that the element about to be removed wasn't the page_last_WS_element
-				//if it was, make the page_last_WS_element the one after it
-				//if the one after it was NULL then the adjust piece of code below will still perform as expected
-				if (element->virtual_address == e->page_last_WS_element->virtual_address)
-					e->page_last_WS_element = LIST_NEXT(element);
-
-				LIST_REMOVE(&(e->page_WS_list), element);
-			}
-		}
-
-
 		//important, check that it exists and has a page table before freeing
-		//note that it could be in the page_WS_list but doesn't have a page table
-		//so removing it from list first then checking is the correct approach
-		//discovered in FIFO test "run tffo2 11"
+		//discovered in FIFO test "run tfifo2 11"
 		uint32* ptr_page_table ;
 		int ret = get_page_table(e->env_page_directory, pagePtr, &ptr_page_table);
 		if (ptr_page_table == NULL) {
