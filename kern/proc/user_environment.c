@@ -464,43 +464,40 @@ void env_free(struct Env *e)
 		struct WorkingSetElement* element = NULL;
 		LIST_FOREACH(element, &(e->page_WS_list)) {
 			unmap_frame(e->env_page_directory, ROUNDDOWN(element->virtual_address,PAGE_SIZE));
-			LIST_REMOVE( &(e->page_WS_list), element);
-			env_page_ws_invalidate(e, element->virtual_address);
+			LIST_REMOVE( &(e->page_WS_list), ROUNDDOWN(element, PAGE_SIZE));
+			kfree(element);
 		}
 
 		LIST_FOREACH(element, &(e->ActiveList)) {
 			unmap_frame(e->env_page_directory,element->virtual_address);
-			LIST_REMOVE(&(e->SecondList),element);
-			env_page_ws_invalidate(e,element->virtual_address);
+			LIST_REMOVE(&(e->ActiveList),element);
+			kfree(element);
 		}
 
 		LIST_FOREACH(element, &(e->SecondList)) {
 			unmap_frame(e->env_page_directory,element->virtual_address);
 			LIST_REMOVE(&(e->SecondList),element);
-			env_page_ws_invalidate(e,element->virtual_address);
+			kfree(element);
 		}
 
 
 		//clear all page tables
 		uint32 pagePtr = USTABDATA;
-		while (pagePtr != USER_LIMIT) {
+		while (pagePtr != USER_TOP) {
 			uint32* ptr_page_table = NULL;
 			int ret = get_page_table(e->env_page_directory, pagePtr, &ptr_page_table);
-			if (ptr_page_table != NULL){
-				pd_clear_page_dir_entry(e->env_page_directory, (uint32)ptr_page_table);
-				unmap_frame(e->env_page_directory, (uint32)ptr_page_table);
+			if (ret == TABLE_IN_MEMORY && ptr_page_table != NULL) {
+				kfree(ptr_page_table);
 			}
-
 
 			pagePtr += PAGE_SIZE;
 		}
 
 
 		//clear page dir
-		e->env_page_directory = NULL;
+		kfree(e->env_page_directory);
 
 	}
-
 
 
 
