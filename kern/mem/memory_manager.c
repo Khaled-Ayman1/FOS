@@ -152,7 +152,45 @@ int allocate_frame(struct FrameInfo **ptr_frame_info)
 		panic("ERROR: Kernel run out of memory... allocate_frame cannot find a free frame.\n");
 		// When allocating new frame, if there's no free frame, then you should:
 		//	1-	If any process has exited (those with status ENV_EXIT), then remove one or more of these exited processes from the main memory
+		int flag = 0;
+		if(queue_size(&env_exit_queue) != 0){
+			flag = 1;
+			struct Env* e = dequeue(&env_exit_queue);
+			sched_kill_env(e->env_id);
+		}
 		//	2-	otherwise, free at least 1 frame from the user working set by applying the FIFO algorithm
+		if(flag == 0)
+		{
+			if(isPageReplacmentAlgorithmFIFO())
+			{
+
+			}
+
+			if(isPageReplacmentAlgorithmLRU(PG_REP_LRU_LISTS_APPROX))
+			{
+				for(int i = 0; i<queue_size(env_ready_queues);i++)
+				{
+					 struct Env_Queue RQ = env_ready_queues[i];
+					 struct Env* movingEnv;
+					 LIST_FOREACH(movingEnv,&RQ)
+					 {
+						struct WorkingSetElement* element_to_eliminate = LIST_LAST(&(movingEnv->SecondList));
+						uint32 perm = pt_get_page_permissions(movingEnv->env_page_directory,element_to_eliminate->virtual_address);
+						if(perm & PERM_MODIFIED){
+
+							uint32* ptr_page_table = NULL;
+							struct FrameInfo* ptr_frame_info = get_frame_info(movingEnv->env_page_directory,element_to_eliminate->virtual_address,&ptr_page_table);
+							pf_update_env_page(movingEnv,element_to_eliminate->virtual_address,ptr_frame_info);
+
+						}
+						LIST_REMOVE(&(movingEnv->SecondList),element_to_eliminate);
+						unmap_frame(movingEnv->env_page_directory,element_to_eliminate->virtual_address);
+						env_page_ws_invalidate(movingEnv,element_to_eliminate->virtual_address);
+					}
+
+				}
+			}
+		}
 	}
 
 	LIST_REMOVE(&free_frame_list,*ptr_frame_info);

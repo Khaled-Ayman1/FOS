@@ -486,8 +486,11 @@ void env_free(struct Env *e)
 		while (pagePtr != USER_LIMIT) {
 			uint32* ptr_page_table = NULL;
 			int ret = get_page_table(e->env_page_directory, pagePtr, &ptr_page_table);
-			if (ptr_page_table != NULL)
+			if (ptr_page_table != NULL){
 				pd_clear_page_dir_entry(e->env_page_directory, (uint32)ptr_page_table);
+				unmap_frame(e->env_page_directory, (uint32)ptr_page_table);
+			}
+
 
 			pagePtr += PAGE_SIZE;
 		}
