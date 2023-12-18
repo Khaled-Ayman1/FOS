@@ -10,6 +10,7 @@
 #include "../cpu/sched.h"
 #include "../disk/pagefile_manager.h"
 #include "../mem/memory_manager.h"
+#include "../mem/kheap.h"
 
 //2014 Test Free(): Set it to bypass the PAGE FAULT on an instruction with this length and continue executing the next one
 // 0 means don't bypass the PAGE FAULT
@@ -140,6 +141,7 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 
 				LIST_REMOVE(&(curenv->page_WS_list), victim);
 
+				kfree(victim);
 
 				placement(curenv, fault_va);
 
@@ -152,7 +154,6 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 
 	if(isPageReplacmentAlgorithmLRU(PG_REP_LRU_LISTS_APPROX))
 	{
-		cprintf("\n in lru\n");
 		//TODO: [PROJECT'23.MS3 - #2] [1] PAGE FAULT HANDLER - LRU Replacement
 		// Write your code here, remove the panic and write your code
 		//panic("page_fault_handler() LRU Replacement is not implemented yet...!!");
@@ -162,12 +163,6 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 		struct FrameInfo* checked_frame;
 		struct FrameInfo* pushed_frame;
 		uint32* ptr_page_table1 = NULL;
-		cprintf("\n before placement\n");
-		env_page_ws_print(curenv);
-		cprintf("\n ALSize=%d\n",ALSize);
-		cprintf("\n SLSize=%d\n",SLSize);
-		cprintf("\n (curenv->page_WS_max_size)=%d\n",(curenv->page_WS_max_size));
-		cprintf("\n fault_va=%x\n",fault_va);
 
 		if((ALSize + SLSize) < (curenv->page_WS_max_size))//one or both of the lists are not full
 		{
@@ -177,7 +172,6 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 			{
 				//active list empty, add element to it
 				//check if element is in active list
-				struct WorkingSetElement* element_to_find;
 				struct WorkingSetElement* new_element = env_page_ws_list_create_element(curenv,fault_va);
 				int flag = 0;
 				checked_frame = get_frame_info(curenv->env_page_directory,fault_va,&ptr_page_table1);
@@ -202,19 +196,21 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 					new_frame->va = fault_va;
 					new_frame->element = new_element;
 					new_frame->element->currentList = 0;
+
 					LIST_INSERT_HEAD(&(curenv->ActiveList),new_frame->element);
 					uint32 page = pf_read_env_page(curenv, (void*) fault_va);
 					if(page == E_PAGE_NOT_EXIST_IN_PF && !(((fault_va <= USTACKTOP && fault_va >= USTACKBOTTOM) ||
 							 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START))))
 					{
-						cprintf("\n wrong kill 1\n");
 						sched_kill_env(curenv->env_id);
 					}
 
 				}
 
-			}else
+			}
+			else
 			{
+
 				//active list is full,add to second list, mark it as NOT PRESENT in second list
 				//check if element is in second list
 				struct WorkingSetElement* new_element = env_page_ws_list_create_element(curenv,fault_va);
@@ -272,7 +268,6 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 					if(page == E_PAGE_NOT_EXIST_IN_PF && !(((fault_va <= USTACKTOP && fault_va >= USTACKBOTTOM) ||
 							 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START))))
 					{
-						cprintf("\n wrong kill 2\n");
 						sched_kill_env(curenv->env_id);
 					}
 				}
@@ -285,8 +280,6 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 		else //both lists are full
 		{
 
-			cprintf("\n replacement\n");
-			cprintf("\n fault_va=%x\n",fault_va);
 			//TODO: [PROJECT'23.MS3 - #1] [1] PAGE FAULT HANDLER - LRU Replacement
 			struct WorkingSetElement* new_element = env_page_ws_list_create_element(curenv,fault_va);
 			struct WorkingSetElement* pushed_element = LIST_LAST(&(curenv->ActiveList));
@@ -294,26 +287,15 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 			int flagSL = 0;
 
 			//check if element in active list
-			cprintf("\n is in active list? \n");
 			checked_frame = get_frame_info(curenv->env_page_directory,fault_va,&ptr_page_table1);
 			if(checked_frame != NULL){
-				cprintf("\n right frame\n");
-				/*
-				 * problem here frame element = 0
-				 * for some reason element is not added to frame
-				 */
-				cprintf("\n frame element=%x\n",checked_frame->element);
-				cprintf("\n currentList=%d\n",checked_frame->element->currentList);
 				if(checked_frame->element->currentList == 0){
-					cprintf("\n right list\n");
 					flagAL = 1;
 				}
 			}
-			cprintf("\n outside if\n");
 			//element already in list
 			if(flagAL)
 			{
-				cprintf("\n found element in active list\n");
 				//remove element from the place its is already in then add it at the head
 				LIST_REMOVE(&(curenv->ActiveList),checked_frame->element);
 				checked_frame->element = new_element;
@@ -325,19 +307,15 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 			//check if element in second list
 			if(flagAL == 0)
 			{
-				cprintf("\n is element in second list? \n");
 				checked_frame = get_frame_info(curenv->env_page_directory,fault_va,&ptr_page_table1);
 				if(checked_frame != NULL){
-					cprintf("\n right frame\n");
 					if(checked_frame->element->currentList == 1){
-						cprintf("\n right list\n");
 						flagSL = 1;
 					}
 				}
 				//element already in list
 				if(flagSL)
 				{
-					cprintf("\n element already exists\n");
 					//remove element from the place its is already in then add it at the head
 					//remove found element from second list
 					LIST_REMOVE(&(curenv->SecondList),checked_frame->element);
@@ -360,9 +338,9 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 				}
 				else //new element added
 				{
-					cprintf("\n new element\n");
 					//have to eliminate last element in second list and do the replacement
 					struct WorkingSetElement* element_to_eliminate = LIST_LAST(&(curenv->SecondList));
+
 					uint32 perm = pt_get_page_permissions(curenv->env_page_directory,element_to_eliminate->virtual_address);
 					if(perm & PERM_MODIFIED){
 
@@ -373,7 +351,7 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 					}
 					LIST_REMOVE(&(curenv->SecondList),element_to_eliminate);
 					unmap_frame(curenv->env_page_directory,element_to_eliminate->virtual_address);
-					//env_page_ws_invalidate(curenv,element_to_eliminate->virtual_address);
+					env_page_ws_invalidate(curenv,element_to_eliminate->virtual_address);
 
 					//remove last element in active list
 					LIST_REMOVE(&(curenv->ActiveList),pushed_element);
@@ -396,7 +374,6 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 					if(page == E_PAGE_NOT_EXIST_IN_PF && !(((fault_va <= USTACKTOP && fault_va >= USTACKBOTTOM) ||
 							 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START))))
 					{
-						cprintf("\n wrong kill 3\n");
 						sched_kill_env(curenv->env_id);
 					}
 
@@ -409,8 +386,6 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 
 
 	}
-		cprintf("\n after placement\n");
-		env_page_ws_print(curenv);
 
 		//TODO: [PROJECT'23.MS3 - BONUS] [1] PAGE FAULT HANDLER - O(1) implementation of LRU replacement
 }
@@ -420,6 +395,7 @@ void __page_fault_handler_with_buffering(struct Env * curenv, uint32 fault_va)
 {
 	panic("this function is not required...!!");
 }
+
 
 
 

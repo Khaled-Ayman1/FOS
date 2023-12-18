@@ -266,6 +266,16 @@ struct Env* env_create(char* user_program_name, unsigned int page_WS_size, unsig
 
 	/// set the modified bit of each page in the ptr_pageWorkingSet to 0
 #if USE_KHEAP
+
+	/**
+	  Tmesh and Hani added here
+	  Implemented LRU O(1)
+	  After loadtime_map_frame, we assign the element to the allocated frame
+	  While inserting to the LRU list it's essential to assign the currentList variable of the element
+	  to be used in the LRU replacement (mark which list it was inserted in)
+	  This applies to the loadtime stack address and the loadtime initial text code addresses
+	**/
+
 	struct WorkingSetElement* wse ;
 	LIST_FOREACH(wse, &(e->page_WS_list))
 	{
@@ -316,7 +326,6 @@ struct Env* env_create(char* user_program_name, unsigned int page_WS_size, unsig
 		allocate_frame(&pp);
 
 		loadtime_map_frame(e->env_page_directory, pp, stackVa, PERM_USER | PERM_WRITEABLE);
-
 		//initialize new page by 0's
 		memset((void*)stackVa, 0, PAGE_SIZE);
 
@@ -324,6 +333,9 @@ struct Env* env_create(char* user_program_name, unsigned int page_WS_size, unsig
 		{
 #if USE_KHEAP
 			wse = env_page_ws_list_create_element(e, (uint32) stackVa);
+			pp->element = wse;
+
+
 			LIST_INSERT_TAIL(&(e->page_WS_list), wse);
 			if (LIST_SIZE(&(e->page_WS_list)) == e->page_WS_max_size)
 			{
@@ -349,10 +361,12 @@ struct Env* env_create(char* user_program_name, unsigned int page_WS_size, unsig
 				if (LIST_SIZE(&(e->ActiveList)) < e->ActiveListSize)
 				{
 					LIST_INSERT_HEAD(&(e->ActiveList), wse);
+					pp->element->currentList = 0;
 				}
 				else
 				{
 					LIST_INSERT_HEAD(&(e->SecondList), wse);
+					pp->element->currentList = 1;
 				}
 #else
 				LIST_REMOVE(&(e->PageWorkingSetList), &(e->ptr_pageWorkingSet[lastWSIndex]));
@@ -441,21 +455,51 @@ void env_run(struct Env *e)
 //
 void env_free(struct Env *e)
 {
-	/*REMOVE THIS LINE BEFORE START CODING*/
-	return;
-	/**************************************/
 
 	//TODO: [PROJECT'23.MS3 - BONUS] EXIT ENV: env_free
 	// your code is here, remove the panic and write your code
 	{
-		panic("env_free() is not implemented yet...!!");
+
+		//clear workingset elements
+		struct WorkingSetElement* element = NULL;
+		LIST_FOREACH(element, &(e->page_WS_list)) {
+			unmap_frame(e->env_page_directory, ROUNDDOWN(element->virtual_address,PAGE_SIZE));
+			LIST_REMOVE( &(e->page_WS_list), element);
+			env_page_ws_invalidate(e, element->virtual_address);
+		}
+
+		LIST_FOREACH(element, &(e->ActiveList)) {
+			unmap_frame(e->env_page_directory,element->virtual_address);
+			LIST_REMOVE(&(e->SecondList),element);
+			env_page_ws_invalidate(e,element->virtual_address);
+		}
+
+		LIST_FOREACH(element, &(e->SecondList)) {
+			unmap_frame(e->env_page_directory,element->virtual_address);
+			LIST_REMOVE(&(e->SecondList),element);
+			env_page_ws_invalidate(e,element->virtual_address);
+		}
 
 
+		//clear all page tables
+		uint32 pagePtr = USTABDATA;
+		while (pagePtr != USER_LIMIT) {
+			uint32* ptr_page_table = NULL;
+			int ret = get_page_table(e->env_page_directory, pagePtr, &ptr_page_table);
+			if (ptr_page_table != NULL)
+				pd_clear_page_dir_entry(e->env_page_directory, (uint32)ptr_page_table);
+
+			pagePtr += PAGE_SIZE;
+		}
 
 
-
+		//clear page dir
+		e->env_page_directory = NULL;
 
 	}
+
+
+
 
 	// [9] remove this program from the page file
 	/*(ALREADY DONE for you)*/
@@ -635,12 +679,15 @@ static int program_segment_alloc_map_copy_workingset(struct Env *e, struct Progr
 		// Allocate a page
 		allocate_frame(&p) ;
 
+
 		LOG_STRING("segment page allocated");
 		loadtime_map_frame(e->env_page_directory, p, iVA, PERM_USER | PERM_WRITEABLE);
 		LOG_STRING("segment page mapped");
 
 #if USE_KHEAP
 		struct WorkingSetElement* wse = env_page_ws_list_create_element(e, iVA);
+		p->element = wse;
+
 		wse->time_stamp = 0;
 		LIST_INSERT_TAIL(&(e->page_WS_list), wse);
 #else
@@ -659,11 +706,14 @@ static int program_segment_alloc_map_copy_workingset(struct Env *e, struct Progr
 			if (LIST_SIZE(&(e->ActiveList)) < e->ActiveListSize - 1)
 			{
 				LIST_INSERT_HEAD(&(e->ActiveList), wse);
+				p->element->currentList = 0;
 			}
 			else
 			{
 				//Add to LRU Second list
 				LIST_INSERT_HEAD(&(e->SecondList), wse);
+				p->element->currentList = 1;
+
 			}
 #else
 
@@ -1042,7 +1092,6 @@ void cleanup_buffers(struct Env* e)
 			//cprintf("[%s] ptr_fi = %x, ptr_fi next = %x \n",curenv->prog_name, ptr_fi, LIST_NEXT(ptr_fi));
 			LIST_REMOVE(&modified_frame_list, ptr_fi);
 
-			cprintf("\nfree_frame E");
 			free_frame(ptr_fi);
 
 			//cprintf("[%s] ptr_fi = %x, ptr_fi next = %x, saved next = %x \n", curenv->prog_name ,ptr_fi, LIST_NEXT(ptr_fi), ___ptr_next);
