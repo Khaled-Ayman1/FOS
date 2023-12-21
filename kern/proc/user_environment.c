@@ -884,10 +884,7 @@ void initialize_environment(struct Env* e, uint32* ptr_user_page_directory, unsi
 	//e->shared_free_address = USER_SHARED_MEM_START;
 	e->nice = 0;
 	e->recent_cpu = fix_int(0);
-
-	fixed_point_t div = fix_div(e->recent_cpu, fix_int(4));
-
-    e->priority = PRI_MAX - fix_trunc(div) - (e->nice * 2);
+    e->priority = PRI_MAX;
 
 	/*2024*/
 	//[PROJECT'23.DONE] call initialize_uheap_dynamic_allocator(...)

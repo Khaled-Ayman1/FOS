@@ -168,18 +168,18 @@ void sched_init_BSD(uint8 numOfLevels, uint8 quantum)
 	sched_delete_ready_queues();
 
 	num_of_ready_queues = numOfLevels;
+
 	load_avg = fix_int(0);
 	ticks = 0;
 
-	quantums = kmalloc(sizeof(uint8) * num_of_ready_queues);
+	quantums = kmalloc(sizeof(uint8));
 	env_ready_queues = kmalloc(sizeof(struct Env_Queue) * num_of_ready_queues);
 
+	quantums[0] = quantum;
 
 	for(int i = 0; i < num_of_ready_queues; i++){
 
 		init_queue(&env_ready_queues[i]);
-		quantums[i] = quantum;
-
 	}
 
 	kclock_set_quantum(quantums[0]);
@@ -213,13 +213,15 @@ struct Env* fos_scheduler_BSD()
 
 	if(curenv != NULL){
 
-		uint32  div = ROUNDUP((PRI_MAX/num_of_ready_queues), 1);
-		uint32 index = ROUNDDOWN((PRI_MAX - curenv->priority)/div, 1);
+		uint32  div = ROUNDUP(((PRI_MAX + 1) / num_of_ready_queues), 1);
+		uint32 index = ROUNDDOWN((PRI_MAX - curenv->priority) / div, 1);
 
 		if(index > num_of_ready_queues - 1)
 			index = num_of_ready_queues - 1;
+		else if(index < 0)
+			index = 0;
 
-		cprintf("\nRunning Stopped, Will Place at Q#%d\n", index);
+		//cprintf("\nRunning Env Stopped, Will Place at Q#%d\n", index);
 		enqueue(&env_ready_queues[index], curenv);
 		curenv->env_status = ENV_READY;
 	}
@@ -227,13 +229,9 @@ struct Env* fos_scheduler_BSD()
 	for(int i = 0; i < num_of_ready_queues; i++){
 
 		if(queue_size(&env_ready_queues[i]) != 0){
-			cprintf("\nIn READY Q#%d\n", i);
+			//cprintf("\nScheduling from READY Q#%d\n", i);
 
-			//sched_print_all();
-
-			//next line causes infinite kernel trap loop since quantum is 0
-			//kclock_set_quantum(quantums[0]);
-			//-------------------------------------------------------------//
+			kclock_set_quantum(quantums[0]);
 
 			return dequeue(&env_ready_queues[i]);
 
@@ -252,39 +250,41 @@ void clock_interrupt_handler()
 {
 	//TODO: [PROJECT'23.MS3 - #5] [2] BSD SCHEDULER - Your code is here
 
-	cprintf("\nTicks: %d\nQuantum: %d\n", timer_ticks() , quantums[0]);
-	//Equation always yields 0
-
-
 	//Running Environment will increment recent cpu
-	if(curenv != NULL){
-
-		cprintf("\nNORMAL TICK -> INCREMENTING ENV: %d\nOld recent:%d\n", curenv->env_id, fix_round(curenv->recent_cpu));
+	if(curenv != NULL)
 
 		curenv->recent_cpu = fix_add(curenv->recent_cpu, fix_int(1));
 
-		cprintf("\nNew recent:%d\n", fix_round(curenv->recent_cpu));
-
-	}
-
-
 	struct Env *ptr_env = NULL;
-	if (((timer_ticks() * quantums[0]) % 1000) <= quantums[0] - 1){
+	if (((timer_ticks() * quantums[0]) % 1000) <= (quantums[0] - 1)){
 
-		cprintf("\n----------------------------------SECOND PASSED----------------------------------\n");
+		//cprintf("\n----------------------------------SECOND PASSED----------------------------------\n");
 
-		num_of_ready_processes = 0;
+		num_of_ready_processes = 1;
 		for(int i = 0; i < num_of_ready_queues; i++)
 			num_of_ready_processes += queue_size(&env_ready_queues[i]);
 
-		load_avg = fix_add(fix_mul(fix_frac(59,60),load_avg), fix_mul(fix_frac(1,60),fix_int(num_of_ready_processes)));
+		fixed_point_t fraction1 = fix_frac(59,60);
+		fixed_point_t fraction2 = fix_frac(1,60);
+		fixed_point_t old_load_avg = load_avg;
+		fixed_point_t dec_ready_processes = fix_int(num_of_ready_processes);
 
-		cprintf("\nNew Load_avg: %d\n", fix_round(load_avg));
+		fixed_point_t div_1 = fix_mul(fraction1, old_load_avg);
+		fixed_point_t div_2 = fix_mul(fraction2, dec_ready_processes);
+
+		load_avg = fix_add(div_1, div_2);
+
+		//cprintf("\nNew Load_avg: %d\n", fix_round(load_avg));
 
 		int j;
 		uint8 new_queue_flag = 1;
-		fixed_point_t a = fix_div(fix_scale(load_avg, 2), fix_add(fix_scale(load_avg, 2), fix_int(1)));
 
+		fixed_point_t mult_load = fix_scale(load_avg, 2);
+		fixed_point_t dec = fix_int(1);
+		fixed_point_t mult_add_load = fix_add(mult_load, dec);
+		fixed_point_t coefficient = fix_div(mult_load, mult_add_load);
+
+		fixed_point_t coeff_recent, dec_nice;
 		struct Env_Queue *queue_type;
 
 		for(int i = 0; i <= num_of_ready_queues; i++){
@@ -303,23 +303,29 @@ void clock_interrupt_handler()
 
 			LIST_FOREACH(ptr_env, &queue_type[j]){
 
-				ptr_env->recent_cpu = fix_add(fix_mul(a, ptr_env->recent_cpu), fix_int(ptr_env->nice));
+				coeff_recent = fix_mul(coefficient, ptr_env->recent_cpu);
+				dec_nice = fix_int(ptr_env->nice);
+				ptr_env->recent_cpu = fix_add(coeff_recent, dec_nice);
 
-				cprintf("\nEnv: %d\nRecent Cpu:%d", ptr_env->env_id, fix_round(ptr_env->recent_cpu));
+				//cprintf("\nEnv: %d\nRecent Cpu:%d", ptr_env->env_id, fix_round(ptr_env->recent_cpu));
 			}
 		}
-		curenv->recent_cpu = fix_add(fix_mul(a, curenv->recent_cpu), fix_int(curenv->nice));
 
-		cprintf("\nUpdating Running Env: %d\nRecent Cpu:%d\n", curenv->env_id, fix_round(curenv->recent_cpu));
+		coeff_recent = fix_mul(coefficient, curenv->recent_cpu);
+		dec_nice = fix_int(curenv->nice);
+		curenv->recent_cpu = fix_add(coeff_recent, dec_nice);
 
-		cprintf("\n---------------------------------------------------------------------------------\n");
+		//cprintf("\nUpdating Running Env: %d\nRecent Cpu:%d\n", curenv->env_id, fix_round(curenv->recent_cpu));
+
+		//cprintf("\n---------------------------------------------------------------------------------\n");
 	}
 
-	if(timer_ticks() % 4 == 0){
+	if(timer_ticks() % 4 == 0 && timer_ticks() > 0){
 
-		cprintf("\n----------------------------\tFOURTH TICK\t----------------------------\n");
+		//cprintf("\n----------------------------\tFOURTH TICK\t----------------------------\n");
 		fixed_point_t div;
-		uint32 old_priority;
+		fixed_point_t dec = fix_int(4);
+		uint32 old_priority, trunc_recent, calc_pri;
 		uint8 new_queue_flag = 1;
 		int j;
 
@@ -345,8 +351,9 @@ void clock_interrupt_handler()
 
 				old_priority = ptr_env->priority;
 
-				div = fix_div(ptr_env->recent_cpu, fix_int(4));
-				uint32 calc_pri = PRI_MAX - fix_trunc(div) - (ptr_env->nice * 2);
+				div = fix_div(ptr_env->recent_cpu, dec);
+				trunc_recent = fix_trunc(div);
+				calc_pri = PRI_MAX - trunc_recent - (ptr_env->nice * 2);
 
 				if(calc_pri > PRI_MAX)
 					ptr_env->priority = PRI_MAX;
@@ -357,29 +364,33 @@ void clock_interrupt_handler()
 				else
 					ptr_env->priority = calc_pri;
 
-				cprintf("Env-> %d\nPriority: %d\n", ptr_env->env_id, ptr_env->priority);
+				//cprintf("Env-> %d\nPriority: %d\n", ptr_env->env_id, ptr_env->priority);
 
 				//Renqueue according to priority
 				if(queue_type == env_ready_queues && ptr_env->priority != old_priority){
 
-					uint32  div = ROUNDUP((PRI_MAX/num_of_ready_queues), 1);
-					uint32 index = ROUNDDOWN((PRI_MAX - ptr_env->priority)/div, 1);
+					uint32  div = ROUNDUP((PRI_MAX + 1 / num_of_ready_queues), 1);
+					uint32 index = ROUNDDOWN((PRI_MAX - ptr_env->priority) / div, 1);
 
 					if(index > num_of_ready_queues - 1)
-							index = num_of_ready_queues - 1;
+						index = num_of_ready_queues - 1;
+					else if(index < 0)
+						index = 0;
 
 					sched_remove_ready(ptr_env);
 					enqueue(&env_ready_queues[index], ptr_env);
 					ptr_env->env_status = ENV_READY;
-					cprintf("\nEnv Renqueued at Q#%d\n", index);
+
+					//cprintf("\nEnv Renqueued at Q#%d\n", index);
 				}
 			}
 		}
 
 		//Updating Running Env
 
-		div = fix_div(curenv->recent_cpu, fix_int(4));
-		uint32 calc_pri = PRI_MAX - fix_trunc(div) - (curenv->nice * 2);
+		div = fix_div(curenv->recent_cpu, dec);
+		trunc_recent = fix_trunc(div);
+		calc_pri = PRI_MAX - trunc_recent - (curenv->nice * 2);
 
 		if(calc_pri > PRI_MAX)
 			curenv->priority = PRI_MAX;
@@ -390,9 +401,9 @@ void clock_interrupt_handler()
 		else
 			curenv->priority = calc_pri;
 
-		cprintf("Running Env-> %d\nNew Priority: %d\n", curenv->env_id, curenv->priority);
+		//cprintf("Running Env-> %d\nNew Priority: %d\n", curenv->env_id, curenv->priority);
 
-		cprintf("\n--------------------------------------------------------\n");
+		//cprintf("\n--------------------------------------------------------\n");
 	}
 
 	/********DON'T CHANGE THIS LINE***********/
