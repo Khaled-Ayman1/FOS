@@ -27,7 +27,6 @@ struct Env_Queue env_exit_queue;	// queue of all exited envs
 //2020:
 #if USE_KHEAP
 	struct Env_Queue *env_ready_queues;	// Ready queue(s) for the MLFQ or RR
-	//struct EnvQueue_List QueueList;
 	uint8 *quantums ;					// Quantum(s) in ms for each level of the ready queue(s)
 #else
 	//RR ONLY

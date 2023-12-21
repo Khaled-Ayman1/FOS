@@ -453,6 +453,7 @@ struct Env * CreateEnv(int number_of_arguments, char **arguments)
 		assert(BSDSchedNiceVal >= -20 && BSDSchedNiceVal <= 20);
 		env_set_nice(env, BSDSchedNiceVal);
 	}
+
 	return env;
 }
 

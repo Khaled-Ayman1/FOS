@@ -393,9 +393,10 @@ void sched_kill_env(uint32 envId)
 //=================================================
 void sched_print_all()
 {
-	struct Env* ptr_env ;
+	struct Env* ptr_env;
 	if (!LIST_EMPTY(&env_new_queue))
 	{
+		// Queue Size is correct, for each has a problem
 		cprintf("\nThe processes in NEW queue are:\n");
 		LIST_FOREACH(ptr_env, &env_new_queue)
 		{
@@ -443,11 +444,15 @@ void sched_print_all()
 void sched_run_all()
 {
 	struct Env* ptr_env=NULL;
-	LIST_FOREACH(ptr_env, &env_new_queue)
+
+	LIST_REVERSE(ptr_env, &env_new_queue)
 	{
 		sched_remove_new(ptr_env);
 		sched_insert_ready0(ptr_env);
 	}
+	//------------------------//
+	sched_print_all();
+	//------------------------//
 	/*2015*///if scheduler not run yet, then invoke it!
 	if (scheduler_status == SCH_STOPPED)
 		fos_scheduler();
@@ -569,7 +574,7 @@ void env_set_nice(struct Env* e, int nice_value)
 		else
 			e->priority = calc_pri;
 
-		cprintf("\nNEW ENV NICE CHANGED - > Priority: %d\n", e->priority);
+		cprintf("\nREADY/RUNNING ENV NICE CHANGED - > Priority: %d\n", e->priority);
 	}
 }
 int env_get_recent_cpu(struct Env* e)
