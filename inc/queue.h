@@ -160,6 +160,7 @@ struct {								\
 #define	LIST_NEXT(elm)	((elm)->prev_next_info.le_next)
 
 #define	LOOP_LIST_NEXT(elm)	( (elm == NULL ? NULL : elm->prev_next_info.le_next) )
+#define LOOP_LIST_PREV(elm)    ( (elm == NULL ? NULL : elm->prev_next_info.le_prev) )
 
 /*
  * Return the element before "elm" in the list.
@@ -185,6 +186,10 @@ struct {								\
 	( (head)->___ptr_next = LOOP_LIST_NEXT((var))) || (var);							\
 	(var) = (head)->___ptr_next)
 
+#define LIST_REVERSE(var, head)                    \
+    for ((var) = LIST_LAST((head));                    \
+    ( (head)->___ptr_next = LOOP_LIST_PREV((var))) || (var);                            \
+    (var) = (head)->___ptr_next)
 /*
  * Reset the list named "head" to the empty list.
  */
