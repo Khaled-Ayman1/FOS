@@ -251,16 +251,19 @@ void clock_interrupt_handler()
 	//TODO: [PROJECT'23.MS3 - #5] [2] BSD SCHEDULER - Your code is here
 
 	//Running Environment will increment recent cpu
-	if(curenv != NULL)
+	num_of_ready_processes = 0;
+	if(curenv != NULL){
 
 		curenv->recent_cpu = fix_add(curenv->recent_cpu, fix_int(1));
+		num_of_ready_processes = 1;
 
+	}
 	struct Env *ptr_env = NULL;
 	if (((timer_ticks() * quantums[0]) % 1000) <= (quantums[0] - 1)){
 
 		//cprintf("\n----------------------------------SECOND PASSED----------------------------------\n");
 
-		num_of_ready_processes = 1;
+
 		for(int i = 0; i < num_of_ready_queues; i++)
 			num_of_ready_processes += queue_size(&env_ready_queues[i]);
 
@@ -276,8 +279,7 @@ void clock_interrupt_handler()
 
 		//cprintf("\nNew Load_avg: %d\n", fix_round(load_avg));
 
-		int j;
-		uint8 new_queue_flag = 1;
+
 
 		fixed_point_t mult_load = fix_scale(load_avg, 2);
 		fixed_point_t dec = fix_int(1);
@@ -285,6 +287,9 @@ void clock_interrupt_handler()
 		fixed_point_t coefficient = fix_div(mult_load, mult_add_load);
 
 		fixed_point_t coeff_recent, dec_nice;
+
+		int j;
+		uint8 new_queue_flag = 1;
 		struct Env_Queue *queue_type;
 
 		for(int i = 0; i <= num_of_ready_queues; i++){
@@ -320,11 +325,13 @@ void clock_interrupt_handler()
 		//cprintf("\n---------------------------------------------------------------------------------\n");
 	}
 
-	if(timer_ticks() % 4 == 0 && timer_ticks() > 0){
+	if(timer_ticks() % 4 == 0){
 
 		//cprintf("\n----------------------------\tFOURTH TICK\t----------------------------\n");
+
 		fixed_point_t div;
 		fixed_point_t dec = fix_int(4);
+
 		uint32 old_priority, trunc_recent, calc_pri;
 		uint8 new_queue_flag = 1;
 		int j;
@@ -367,7 +374,7 @@ void clock_interrupt_handler()
 				//cprintf("Env-> %d\nPriority: %d\n", ptr_env->env_id, ptr_env->priority);
 
 				//Renqueue according to priority
-				if(queue_type == env_ready_queues && ptr_env->priority != old_priority){
+				if(queue_type == env_ready_queues && ptr_env->priority != old_priority && timer_ticks() > 0){
 
 					uint32  div = ROUNDUP((PRI_MAX + 1 / num_of_ready_queues), 1);
 					uint32 index = ROUNDDOWN((PRI_MAX - ptr_env->priority) / div, 1);
