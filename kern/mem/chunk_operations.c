@@ -136,7 +136,6 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 
 	}
 
-	//panic("allocate_user_mem() is not implemented yet...!!");
 }
 
 //=====================================
@@ -185,6 +184,7 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 
 		pagePtr += PAGE_SIZE;
 		numOfPages--;
+
 	}
 
 
@@ -192,6 +192,18 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	if(isPageReplacmentAlgorithmFIFO() && e->page_last_WS_element != NULL) {
 
 		struct WorkingSetElement* curr_element;
+
+
+		//make sure it exists in the list
+		//so that you don't adjust after free was called with a random address that wasn't in the list to begin with
+		bool found = 0;
+		LIST_FOREACH(curr_element, &(e->page_WS_list)) {
+			if (curr_element->virtual_address == virtual_address)
+				found = 1;
+		}
+		if (!found) return;
+
+
 		if (e->page_last_WS_element != NULL) {
 
 			//re-sort the FIFO, make the page_last_WS_element as the head with the others following it
