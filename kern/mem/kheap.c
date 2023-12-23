@@ -72,9 +72,6 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 
 void* sbrk(int increment)
 {
-	cprintf("\n increment=%d\n",increment);
-		cprintf("\n kbreak=%x\n",kbreak);
-	//cprintf("\n kheap sbrk\n");
 	if (increment == 0)
 		return (void*)kbreak;
 
@@ -96,7 +93,6 @@ void* sbrk(int increment)
 		pagePtr = ROUNDUP(exStart,PAGE_SIZE);
 
 		for(int i = 0; i < numOfPages; i++){
-			cprintf("\n in for loop increment\n");
 			allocate_frame(&ptr_frame_info);
 
 			map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
@@ -133,7 +129,7 @@ void* sbrk(int increment)
 
 		for(int i = 0;i<numOfPages;i++)
 		{
-			cprintf("\n in for loop sbrk\n");
+
 			exStart -= PAGE_SIZE;
 
 			get_page_table(ptr_page_directory, exStart, &ptr_page_table);
@@ -392,7 +388,7 @@ void *krealloc(void *virtual_address, uint32 new_size)
 		return alloc_block_FF(new_size);
 		//return realloc_block_FF(virtual_address, new_size);
 	}
-	
+
 	//was dyn block and now will be page
 	if (isDynBlock && new_size > DYN_ALLOC_MAX_BLOCK_SIZE) {
 		free_block(virtual_address);

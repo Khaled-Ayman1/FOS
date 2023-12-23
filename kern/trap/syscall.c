@@ -516,7 +516,6 @@ void sys_bypassPageFault(uint8 instrLength)
 /*2024*/
 void* sys_sbrk(int increment)
 {
-	cprintf("\n in sys_sbrk \n");
 	//TODO: [PROJECT'23.MS2 - #08] [2] USER HEAP - Block Allocator - sys_sbrk() [Kernel Side]
 	//MS2: COMMENT THIS LINE BEFORE START CODING====
 	//return (void*)-1;

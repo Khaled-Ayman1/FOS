@@ -123,7 +123,6 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	uint32 pagePtr = virtual_address;
 	int ret;
 	for(int i = 0; i < numOfPages; i++){
-		cprintf("\n alloc adrs = %x\n",pagePtr);
 		ret = get_page_table(e->env_page_directory, pagePtr, &ptr_page_table);
 
 		if(ret == TABLE_NOT_EXIST)
@@ -178,7 +177,6 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 		//have to remove the freed element from the active or second list in lru
 		if(isPageReplacmentAlgorithmLRU(PG_REP_LRU_LISTS_APPROX)){
 			ptr_frame = get_frame_info(e->env_page_directory,pagePtr,&ptr_page_table);
-			cprintf("\n free lru\n");
 			//frame exists
 			if(ptr_frame != NULL){
 
