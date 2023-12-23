@@ -570,19 +570,22 @@ void env_set_nice(struct Env* e, int nice_value)
 
 	if(e->env_status != ENV_NEW){
 
+		fixed_point_t dec_pri = fix_int(PRI_MAX);
 		fixed_point_t div = fix_unscale(e->recent_cpu, 4);
-		uint32 trunc_recent = fix_trunc(div);
+		fixed_point_t calc_pri = fix_sub(dec_pri, div);
+		fixed_point_t dec_nice = fix_int(e->nice * 2);
+		calc_pri = fix_sub(calc_pri, dec_nice);
 
-		uint32 calc_pri = PRI_MAX - trunc_recent - (e->nice * 2);
+		uint32 trunc_priority = fix_trunc(calc_pri);
 
-		if(calc_pri > PRI_MAX)
+		if(trunc_priority > PRI_MAX)
 			e->priority = PRI_MAX;
 
-		else if(calc_pri < PRI_MIN)
+		else if(trunc_priority < PRI_MIN)
 			e->priority = PRI_MIN;
 
 		else
-			e->priority = calc_pri;
+			e->priority = trunc_priority;
 
 		cprintf("\nREADY/RUNNING ENV NICE CHANGED - > Priority: %d\n", e->priority);
 	}
@@ -591,15 +594,15 @@ int env_get_recent_cpu(struct Env* e)
 {
 	//TODO: [PROJECT'23.MS3 - #3] [2] BSD SCHEDULER - env_get_recent_cpu
 
-	int int_recent_cpu = fix_round(e->recent_cpu);
-	return int_recent_cpu * 100;
+	fixed_point_t scaled_recent_cpu = fix_scale(e->recent_cpu, 100);
+	return fix_round(scaled_recent_cpu);
 }
 int get_load_average()
 {
 	//TODO: [PROJECT'23.MS3 - #3] [2] BSD SCHEDULER - get_load_average
 
-	int integer_load_avg = fix_round(load_avg);
-	return integer_load_avg * 100;
+	fixed_point_t scaled_load_avg = fix_scale(load_avg, 100);
+	return fix_round(scaled_load_avg);
 }
 /********* for BSD Priority Scheduler *************/
 //==================================================================================//
