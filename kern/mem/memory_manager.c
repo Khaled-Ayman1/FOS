@@ -149,10 +149,97 @@ int allocate_frame(struct FrameInfo **ptr_frame_info)
 	if (*ptr_frame_info == NULL)
 	{
 		//TODO: [PROJECT'23.MS3 - BONUS] Free RAM when it's FULL
-		panic("ERROR: Kernel run out of memory... allocate_frame cannot find a free frame.\n");
 		// When allocating new frame, if there's no free frame, then you should:
 		//	1-	If any process has exited (those with status ENV_EXIT), then remove one or more of these exited processes from the main memory
+		int flag = 0;
+		if(queue_size(&env_exit_queue) != 0){
+			flag = 1;
+			struct Env* e = dequeue(&env_exit_queue);
+			sched_kill_env(e->env_id);
+		}
 		//	2-	otherwise, free at least 1 frame from the user working set by applying the FIFO algorithm
+		if(flag == 0)
+		{
+			if(isPageReplacmentAlgorithmFIFO())
+			{
+				for(int i = 0; i<queue_size(env_ready_queues);i++)
+				{
+					struct Env_Queue RQ = env_ready_queues[i];
+					struct Env* movingEnv;
+                    LIST_FOREACH(movingEnv,&RQ)
+					{
+                    	//remove victim, unmap it and remove from list and write it to disk
+						uint32 *ptr_page_table = NULL;
+						struct WorkingSetElement* victim = movingEnv->page_last_WS_element;
+						uint32 victim_perm = pt_get_page_permissions(movingEnv->env_page_directory, ROUNDDOWN(victim->virtual_address, PAGE_SIZE));
+						struct FrameInfo* victim_frame = get_frame_info(movingEnv->env_page_directory, ROUNDDOWN(victim->virtual_address, PAGE_SIZE), &ptr_page_table);
+
+						//if modified, write to disk
+						if ((victim_perm & PERM_MODIFIED) == PERM_MODIFIED) {
+							int ret = pf_update_env_page(movingEnv, ROUNDDOWN(victim->virtual_address, PAGE_SIZE), victim_frame);
+							if (ret == E_NO_PAGE_FILE_SPACE)
+								panic("ERROR: No enough virtual space on the page file");
+						}
+
+						if (movingEnv->page_last_WS_element == victim)
+						{
+							movingEnv->page_last_WS_element = LIST_NEXT(victim);
+						}
+
+						//unmap victim and remove it from list and free element
+						unmap_frame(movingEnv->env_page_directory, ROUNDDOWN(victim->virtual_address,PAGE_SIZE));
+						LIST_REMOVE(&(movingEnv->page_WS_list), victim);
+						kfree(victim);
+
+
+						//adjust FIFO order
+						struct WorkingSetElement* curr_element;
+						if (movingEnv->page_last_WS_element != NULL) {
+
+							//re-sort the FIFO, make the page_last_WS_element as the head with the others following it
+							//example: {a,b,c,d,NULL} if c is the head then the result should be {c,d,a,b,NULL}
+							//then c is no longer marked as page_last_WS_element, as the list is not full and so that placement (if any) can place at the tail
+							LIST_FOREACH(curr_element, &(movingEnv->page_WS_list)) {
+								if (curr_element->virtual_address == movingEnv->page_last_WS_element->virtual_address)
+									break;
+
+								struct WorkingSetElement* new_element = curr_element;
+								LIST_REMOVE(&(movingEnv->page_WS_list), curr_element);
+								LIST_INSERT_TAIL(&(movingEnv->page_WS_list), new_element);
+							}
+						}
+
+						movingEnv->page_last_WS_element = NULL;
+
+					}
+				}
+			}
+
+			if(isPageReplacmentAlgorithmLRU(PG_REP_LRU_LISTS_APPROX))
+			{
+				for(int i = 0; i<queue_size(env_ready_queues);i++)
+				{
+					 struct Env_Queue RQ = env_ready_queues[i];
+					 struct Env* movingEnv;
+					 LIST_FOREACH(movingEnv,&RQ)
+					 {
+						struct WorkingSetElement* element_to_eliminate = LIST_LAST(&(movingEnv->SecondList));
+						uint32 perm = pt_get_page_permissions(movingEnv->env_page_directory,element_to_eliminate->virtual_address);
+						if(perm & PERM_MODIFIED){
+
+							uint32* ptr_page_table = NULL;
+							struct FrameInfo* ptr_frame_info = get_frame_info(movingEnv->env_page_directory,element_to_eliminate->virtual_address,&ptr_page_table);
+							pf_update_env_page(movingEnv,element_to_eliminate->virtual_address,ptr_frame_info);
+
+						}
+						LIST_REMOVE(&(movingEnv->SecondList),element_to_eliminate);
+						unmap_frame(movingEnv->env_page_directory,element_to_eliminate->virtual_address);
+						env_page_ws_invalidate(movingEnv,element_to_eliminate->virtual_address);
+					}
+
+				}
+			}
+		}
 	}
 
 	LIST_REMOVE(&free_frame_list,*ptr_frame_info);

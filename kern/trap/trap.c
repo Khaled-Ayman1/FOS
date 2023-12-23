@@ -387,7 +387,7 @@ void fault_handler(struct Trapframe *tf)
 			}
 
 
-			if((perm & PERM_WRITEABLE) == 0 && (perm & PERM_USER))
+			if((perm & PERM_WRITEABLE) == 0 && (perm & PERM_PRESENT))
 			{
 				 sched_kill_env(faulted_env->env_id);
 			}
@@ -396,6 +396,8 @@ void fault_handler(struct Trapframe *tf)
 			{
 				sched_kill_env(faulted_env->env_id);
 			}
+
+
 
 			/*============================================================================================*/
 		}
