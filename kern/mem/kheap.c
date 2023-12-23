@@ -354,7 +354,11 @@ void kexpand(uint32 newSize)
 void *krealloc(void *virtual_address, uint32 new_size)
 {
 	//TODO: [PROJECT'23.MS2 - BONUS#1] [1] KERNEL HEAP - krealloc()
-	// Write your code here, remove the panic and write your code
+
+	int isDynBlock = 0;
+	if (virtual_address >= (void*) KERNEL_HEAP_START && virtual_address < (void*)khl ) {
+		isDynBlock = 1;
+	}
 
 	if (new_size == 0) {
 		kfree(virtual_address);
@@ -382,8 +386,28 @@ void *krealloc(void *virtual_address, uint32 new_size)
 	uint32 oldLastPage = (uint32)virtual_address + ((oldNumOfPages-1) * PAGE_SIZE);
 
 
-	//2 cases, if negative then deallocate, if positive then allocate above or free it and recall kmalloc if no space above it
+	//was dyn block and still dyn block
+	if (isDynBlock && new_size <= DYN_ALLOC_MAX_BLOCK_SIZE) {
+		free_block(virtual_address);
+		return alloc_block_FF(new_size);
+		//return realloc_block_FF(virtual_address, new_size);
+	}
+	
+	//was dyn block and now will be page
+	if (isDynBlock && new_size > DYN_ALLOC_MAX_BLOCK_SIZE) {
+		free_block(virtual_address);
+		return kmalloc(new_size);
+	}
+	//was page and now will be dyn alloc
+	if (!isDynBlock && new_size <= DYN_ALLOC_MAX_BLOCK_SIZE) {
+		kfree(virtual_address);
+		return alloc_block_FF(new_size);
 
+	}
+
+
+
+	//2 cases, if negative then deallocate, if positive then allocate above or free it and recall kmalloc if no space above it
 
 	if (numDifferences >= 0) {
 
@@ -443,6 +467,4 @@ void *krealloc(void *virtual_address, uint32 new_size)
 	ptr_frame_info->numOfPages = newNumOfPages;
 
 	return virtual_address;
-
-	//panic("krealloc() is not implemented yet...!!");
 }
