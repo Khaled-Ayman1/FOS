@@ -123,7 +123,7 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	uint32 pagePtr = virtual_address;
 	int ret;
 	for(int i = 0; i < numOfPages; i++){
-
+		cprintf("\n alloc adrs = %x\n",pagePtr);
 		ret = get_page_table(e->env_page_directory, pagePtr, &ptr_page_table);
 
 		if(ret == TABLE_NOT_EXIST)
@@ -144,11 +144,11 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 //=====================================
 void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 {
-
+	struct FrameInfo* ptr_frame;
 	uint32 pagePtr = virtual_address;
 	uint32 perm;
 	uint32 numOfPages = size;
-
+	uint32* ptr_page_table = NULL;
 
 
 	while(numOfPages > 0){
@@ -162,20 +162,69 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 			continue;
 		}
 
-
 		//important, check that it exists and has a page table before freeing
 		//discovered in FIFO test "run tfifo2 11"
-		uint32* ptr_page_table ;
-		int ret = get_page_table(e->env_page_directory, pagePtr, &ptr_page_table);
-		if (ptr_page_table == NULL) {
+		uint32* ptr_page_table2 ;
+		int ret = get_page_table(e->env_page_directory, pagePtr, &ptr_page_table2);
+		if (ptr_page_table2 == NULL) {
 			pagePtr += PAGE_SIZE;
 			numOfPages--;
 			continue;
 		}
 
+		//have to remove the freed element from the active or second list in lru
+		if(isPageReplacmentAlgorithmLRU(PG_REP_LRU_LISTS_APPROX)){
+			ptr_frame = get_frame_info(e->env_page_directory,pagePtr,&ptr_page_table);
+			cprintf("\n free lru\n");
+			//frame exists
+			if(ptr_frame != NULL){
+
+				//if element in active list remove it from active list
+				if(ptr_frame->element->currentList == 0){
+					struct WorkingSetElement* ptr_tmp_WS_element = LIST_FIRST(&(e->SecondList));
+
+					LIST_REMOVE(&(e->ActiveList),ptr_frame->element);
+
+					kfree(ptr_frame->element);
+
+					if(ptr_tmp_WS_element != NULL)
+					{
+						LIST_REMOVE(&(e->SecondList), ptr_tmp_WS_element);
+						LIST_INSERT_TAIL(&(e->ActiveList), ptr_tmp_WS_element);
+						pt_set_page_permissions(e->env_page_directory, ptr_tmp_WS_element->virtual_address, PERM_PRESENT, 0);
+					}
+
+				//else if the element is in the second list
+				}else if(ptr_frame->element->currentList == 1){
+
+					//check if it is the last element then u have to check if modified and write
+					if(ptr_frame->element->virtual_address == LIST_LAST(&(e->SecondList))->virtual_address){
+
+						uint32 perm = pt_get_page_permissions(e->env_page_directory,ptr_frame->element->virtual_address);
+						if(perm & PERM_MODIFIED){
+
+							uint32* ptr_page_table1 = NULL;
+							struct FrameInfo* ptr_frame_info = get_frame_info(e->env_page_directory,ptr_frame->element->virtual_address,&ptr_page_table1);
+							pf_update_env_page(e,ptr_frame->element->virtual_address,ptr_frame_info);
+
+						}
+						LIST_REMOVE(&(e->SecondList),ptr_frame->element);
+
+						kfree(ptr_frame->element);
+					//element is not the last element remove like active list remove
+					}else {
+						LIST_REMOVE(&(e->SecondList),ptr_frame->element);
+
+						kfree(ptr_frame->element);
+					}
+				}
+			}
+		}
 
 
-		env_page_ws_invalidate(e, pagePtr);
+		if(isPageReplacmentAlgorithmFIFO()){
+			env_page_ws_invalidate(e, pagePtr);
+		}
 
 		pf_remove_env_page(e, pagePtr);
 
@@ -192,6 +241,17 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	if(isPageReplacmentAlgorithmFIFO() && e->page_last_WS_element != NULL) {
 
 		struct WorkingSetElement* curr_element;
+
+		//make sure it exists in the list
+		//so that you don't adjust after free was called with a random address that wasn't in the list to begin with
+		bool found = 0;
+		LIST_FOREACH(curr_element, &(e->page_WS_list)) {
+			if (curr_element->virtual_address == virtual_address)
+				found = 1;
+		}
+		if (!found) return;
+
+
 		if (e->page_last_WS_element != NULL) {
 
 			//re-sort the FIFO, make the page_last_WS_element as the head with the others following it
@@ -210,6 +270,8 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 		e->page_last_WS_element = NULL;
 
 	}
+
+
 
 
 }

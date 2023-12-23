@@ -72,14 +72,18 @@ int initialize_kheap_dynamic_allocator(uint32 daStart, uint32 initSizeToAllocate
 
 void* sbrk(int increment)
 {
+	cprintf("\n increment=%d\n",increment);
+		cprintf("\n kbreak=%x\n",kbreak);
+	//cprintf("\n kheap sbrk\n");
 	if (increment == 0)
 		return (void*)kbreak;
 
 	int numOfPages = increment/PAGE_SIZE;
 
+
 	if(increment > 0 && (increment + kbreak) <= khl)
 	{
-		uint32 pagePtr,exStart = kbreak = ROUNDUP(kbreak,PAGE_SIZE);
+		uint32 pagePtr,exStart = kbreak;// = ROUNDUP(kbreak,PAGE_SIZE);
 		int fret,mret;
 
 		struct FrameInfo *ptr_frame_info;
@@ -88,23 +92,17 @@ void* sbrk(int increment)
 			numOfPages++;
 
 		kbreak += (numOfPages * PAGE_SIZE);
-		pagePtr = exStart;
+		kbreak = ROUNDDOWN(kbreak,PAGE_SIZE);
+		pagePtr = ROUNDUP(exStart,PAGE_SIZE);
 
 		for(int i = 0; i < numOfPages; i++){
+			cprintf("\n in for loop increment\n");
+			allocate_frame(&ptr_frame_info);
 
-			fret = allocate_frame(&ptr_frame_info);
+			map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
 
-			if(fret == 0)
-			{
-				int mret = map_frame(ptr_page_directory, ptr_frame_info, pagePtr, PERM_WRITEABLE);
+			ptr_frame_info->va = pagePtr;
 
-				if(mret != 0){
-					panic("Unsuccessful Map");
-				}
-
-				ptr_frame_info->va = pagePtr;
-
-			}
 			pagePtr += PAGE_SIZE;
 		}
 
@@ -129,9 +127,13 @@ void* sbrk(int increment)
 
 		kbreak += increment;
 		numOfPages *= -1;
+		if(ROUNDUP(exStart,PAGE_SIZE)- kbreak >=PAGE_SIZE){
+			numOfPages++;
+		}
 
 		for(int i = 0;i<numOfPages;i++)
 		{
+			cprintf("\n in for loop sbrk\n");
 			exStart -= PAGE_SIZE;
 
 			get_page_table(ptr_page_directory, exStart, &ptr_page_table);

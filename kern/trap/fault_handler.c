@@ -162,10 +162,14 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 		struct FrameInfo* new_frame;
 		struct FrameInfo* checked_frame;
 		struct FrameInfo* pushed_frame;
+		//cprintf("\n before lru placement\n");
+		//env_page_ws_print(curenv);
+		//cprintf("\n fault address =%x\n",fault_va);
 		uint32* ptr_page_table1 = NULL;
 
 		if((ALSize + SLSize) < (curenv->page_WS_max_size))//one or both of the lists are not full
 		{
+			//cprintf("\n in placement\n");
 			//TODO: [PROJECT'23.MS3 - #2] [1] PAGE FAULT HANDLER – LRU Placement
 
 			if(ALSize < (curenv->ActiveListSize))
@@ -279,7 +283,7 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 		}
 		else //both lists are full
 		{
-
+			//cprintf("\n in replacement\n");
 			//TODO: [PROJECT'23.MS3 - #1] [1] PAGE FAULT HANDLER - LRU Replacement
 			struct WorkingSetElement* new_element = env_page_ws_list_create_element(curenv,fault_va);
 			struct WorkingSetElement* pushed_element = LIST_LAST(&(curenv->ActiveList));
@@ -351,7 +355,8 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 					}
 					LIST_REMOVE(&(curenv->SecondList),element_to_eliminate);
 					unmap_frame(curenv->env_page_directory,element_to_eliminate->virtual_address);
-					env_page_ws_invalidate(curenv,element_to_eliminate->virtual_address);
+					kfree(element_to_eliminate);
+					//env_page_ws_invalidate(curenv,element_to_eliminate->virtual_address);
 
 					//remove last element in active list
 					LIST_REMOVE(&(curenv->ActiveList),pushed_element);
@@ -388,6 +393,8 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 	}
 
 		//TODO: [PROJECT'23.MS3 - BONUS] [1] PAGE FAULT HANDLER - O(1) implementation of LRU replacement
+		//cprintf("\n after lru placement\n");
+		//env_page_ws_print(curenv);
 }
 
 
@@ -422,6 +429,7 @@ void placement(struct Env * curenv, uint32 fault_va) {
 
 		//allocate the new one
 		struct FrameInfo *newFrame;
+		int perm = pt_get_page_permissions(curenv->env_page_directory,fault_va);
 		uint32 fret  = allocate_frame(&newFrame);
 		map_frame(curenv->env_page_directory, newFrame, fault_va, PERM_WRITEABLE | PERM_USER);
 		newFrame->va = fault_va;
@@ -432,6 +440,10 @@ void placement(struct Env * curenv, uint32 fault_va) {
 			 if (!(((fault_va <= USTACKTOP && fault_va >= USTACKBOTTOM) ||
 				 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START)))) {
 					sched_kill_env(curenv->env_id);
+			 }
+			 if((perm & PERM_MARKED) == 0)
+			 {
+				 sched_kill_env(curenv->env_id);
 			 }
 		}
 
