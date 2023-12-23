@@ -136,7 +136,6 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 
 	}
 
-	//panic("allocate_user_mem() is not implemented yet...!!");
 }
 
 //=====================================
@@ -234,6 +233,7 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 
 		pagePtr += PAGE_SIZE;
 		numOfPages--;
+
 	}
 
 
@@ -242,6 +242,10 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 
 		struct WorkingSetElement* curr_element;
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/lruO1
 		//make sure it exists in the list
 		//so that you don't adjust after free was called with a random address that wasn't in the list to begin with
 		bool found = 0;
