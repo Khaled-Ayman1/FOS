@@ -19,6 +19,7 @@ typedef struct
   }
 fixed_point_t;
 
+
 /* Returns a fixed-point number with F as its internal value. */
 static inline fixed_point_t
 __mk_fix (int f)

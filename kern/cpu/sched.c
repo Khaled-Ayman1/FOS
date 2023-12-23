@@ -8,7 +8,7 @@
 #include <kern/mem/memory_manager.h>
 #include <kern/tests/utilities.h>
 #include <kern/cmd/command_prompt.h>
-
+#include <inc/queue.h>
 
 uint32 isSchedMethodRR(){if(scheduler_method == SCH_RR) return 1; return 0;}
 uint32 isSchedMethodMLFQ(){if(scheduler_method == SCH_MLFQ) return 1; return 0;}
@@ -162,10 +162,29 @@ void sched_init_MLFQ(uint8 numOfLevels, uint8 *quantumOfEachLevel)
 void sched_init_BSD(uint8 numOfLevels, uint8 quantum)
 {
 #if USE_KHEAP
+
 	//TODO: [PROJECT'23.MS3 - #4] [2] BSD SCHEDULER - sched_init_BSD
-	//Your code is here
-	//Comment the following line
-	panic("Not implemented yet");
+
+	sched_delete_ready_queues();
+
+	num_of_ready_queues = numOfLevels;
+
+	load_avg = fix_int(0);
+	ticks = 0;
+
+	quantums = kmalloc(sizeof(uint8));
+	env_ready_queues = kmalloc(sizeof(struct Env_Queue) * num_of_ready_queues);
+
+	quantums[0] = quantum;
+
+	for(int i = 0; i < num_of_ready_queues; i++){
+
+		init_queue(&env_ready_queues[i]);
+	}
+	for(int i = 0; i < 1000; i++){
+		removed_envs[i] = NULL;
+	}
+	kclock_set_quantum(quantums[0]);
 
 	//=========================================
 	//DON'T CHANGE THESE LINES=================
@@ -192,9 +211,33 @@ struct Env* fos_scheduler_MLFQ()
 struct Env* fos_scheduler_BSD()
 {
 	//TODO: [PROJECT'23.MS3 - #5] [2] BSD SCHEDULER - fos_scheduler_BSD
-	//Your code is here
-	//Comment the following line
-	panic("Not implemented yet");
+
+	if(curenv != NULL){
+
+		fixed_point_t  div = fix_frac((PRI_MAX + 1), num_of_ready_queues);
+		uint32 index = (PRI_MAX - curenv->priority) / fix_round(div);
+
+		//cprintf("\nRunning Env Stopped, Will Place at Q#%d\n", index);
+
+		enqueue(&env_ready_queues[index], curenv);
+		curenv->env_status = ENV_READY;
+	}
+
+	for(int i = 0; i < num_of_ready_queues; i++){
+
+		if(queue_size(&env_ready_queues[i]) != 0){
+
+			//cprintf("\n\nScheduling from READY Q#%d\n", i);
+			//cprintf("\n---------------------------------------------------------------------------------\n");
+
+			kclock_set_quantum(quantums[0]);
+
+			return dequeue(&env_ready_queues[i]);
+
+		}
+	}
+
+	load_avg = fix_int(0);
 	return NULL;
 }
 
@@ -205,12 +248,190 @@ struct Env* fos_scheduler_BSD()
 void clock_interrupt_handler()
 {
 	//TODO: [PROJECT'23.MS3 - #5] [2] BSD SCHEDULER - Your code is here
-	{
 
+	//Running Environment will increment recent cpu
+	num_of_ready_processes = 0;
+	if(curenv != NULL){
 
+		curenv->recent_cpu = fix_add(curenv->recent_cpu, fix_int(1));
+
+		//cprintf("\n---------INCREMENTING RUNNING RECENT ENV [%d] = %d---------\n",curenv->env_id, env_get_recent_cpu(curenv));
+
+		num_of_ready_processes++;
 
 	}
 
+	struct Env *ptr_env = NULL;
+	if (((timer_ticks() * quantums[0]) % 1000) <= (quantums[0] - 1) && timer_ticks() > 0){
+
+		//cprintf("\n----------------------------------SECOND PASSED----------------------------------\n");
+
+		for(int i = 0; i < num_of_ready_queues; i++)
+			num_of_ready_processes += queue_size(&env_ready_queues[i]);
+
+		//cprintf("\nProcesses:%d\n", num_of_ready_processes);
+
+		fixed_point_t fraction1 = fix_frac(59,60);
+		fixed_point_t fraction2 = fix_frac(1,60);
+		fixed_point_t old_load_avg = load_avg;
+		fixed_point_t dec_ready_processes = fix_int(num_of_ready_processes);
+
+		fixed_point_t div_1 = fix_mul(fraction1, old_load_avg);
+		fixed_point_t div_2 = fix_mul(fraction2, dec_ready_processes);
+
+		load_avg = fix_add(div_1, div_2);
+
+		//cprintf("\nLoad Avg: %d\n", get_load_average());
+
+		fixed_point_t coeff_recent, dec_nice;
+
+		fixed_point_t mult_load = fix_scale(load_avg, 2);
+		fixed_point_t mult_add_load = fix_add(mult_load, fix_int(1));
+		fixed_point_t coefficient = fix_div(mult_load, mult_add_load);
+
+		int j;
+		uint8 new_queue_flag = 1;
+		struct Env_Queue *queue_type;
+
+		for(int i = 0; i <= num_of_ready_queues; i++){
+
+			if(new_queue_flag){
+				queue_type = &env_new_queue;
+				new_queue_flag = 0;
+				j = i;
+			}
+			else{
+				queue_type = env_ready_queues;
+				j = i - 1;
+			}
+			if(queue_size(&queue_type[j]) == 0)
+				continue;
+
+			LIST_FOREACH(ptr_env, &queue_type[j]){
+
+				coeff_recent = fix_mul(coefficient, ptr_env->recent_cpu);
+				dec_nice = fix_int(ptr_env->nice);
+				ptr_env->recent_cpu = fix_add(coeff_recent, dec_nice);
+
+				//cprintf("\nEnv: %d\nRecent Cpu:%d", ptr_env->env_id, env_get_recent_cpu(ptr_env));
+			}
+		}
+
+		coeff_recent = fix_mul(coefficient, curenv->recent_cpu);
+		dec_nice = fix_int(curenv->nice);
+		curenv->recent_cpu = fix_add(coeff_recent, dec_nice);
+
+		//cprintf("\nUpdating Running Env: %d\nRecent Cpu:%d\n", curenv->env_id, env_get_recent_cpu(curenv));
+
+		//cprintf("\n---------------------------------------------------------------------------------\n");
+	}
+
+	if((timer_ticks() + 1) % 4 == 0){
+
+		//cprintf("\n----------------------------\tFOURTH TICK\t----------------------------\n");
+
+		fixed_point_t div, dec_pri, dec_nice, calc_pri;
+		uint32 trunc_priority;
+
+		uint8 new_queue_flag = 1;
+		int j;
+
+		struct Env_Queue *queue_type;
+
+		int index = 0;
+		for(int i = 0; i <= num_of_ready_queues; i++){
+
+			if(new_queue_flag){
+
+				queue_type = &env_new_queue;
+				new_queue_flag = 0;
+				j = i;
+			}
+			else{
+				queue_type = env_ready_queues;
+				j = i - 1;
+			}
+
+			if(queue_size(&queue_type[j]) == 0)
+				continue;
+
+			LIST_REVERSE(ptr_env, &queue_type[j]){
+
+				dec_pri = fix_int(PRI_MAX);
+				div = fix_unscale(ptr_env->recent_cpu, 4);
+				calc_pri = fix_sub(dec_pri, div);
+				dec_nice = fix_int(ptr_env->nice * 2);
+				calc_pri = fix_sub(calc_pri, dec_nice);
+
+				trunc_priority = fix_trunc(calc_pri);
+
+				if(trunc_priority > PRI_MAX)
+					ptr_env->priority = PRI_MAX;
+
+				else if(trunc_priority < PRI_MIN)
+					ptr_env->priority = PRI_MIN;
+
+				else
+					ptr_env->priority = trunc_priority;
+
+
+				//cprintf("Env-> %d\nPriority: %d\n", ptr_env->env_id, ptr_env->priority);
+
+				//Remove from ready queue for enqueue
+				if(queue_type == env_ready_queues){
+
+					removed_envs[index] = ptr_env;
+
+					LIST_REMOVE(&(queue_type[j]), ptr_env);
+
+					index++;
+				}
+			}
+		}
+
+		//Renqueue
+		for(int i = 0; i < 1000; i++){
+
+			if(removed_envs[i] == NULL)
+				continue;
+
+			//cprintf("\nRemoved Array at INDEX %d --- Env ID: %d\n", i, removed_envs[i]->env_id);
+
+			div = fix_frac((PRI_MAX + 1), num_of_ready_queues);
+			uint32 assignIndex = (PRI_MAX - removed_envs[i]->priority) / fix_round(div);
+
+			//cprintf("div = %d\npriority: %d\nWill be reassigned at %d", fix_round(div), removed_envs[i]->priority, assignIndex);
+
+			enqueue(&env_ready_queues[assignIndex], removed_envs[i]);
+			removed_envs[i]->env_status = ENV_READY;
+
+			removed_envs[i] = NULL;
+
+		}
+
+		//Updating Running Env
+
+		dec_pri = fix_int(PRI_MAX);
+		div = fix_unscale(curenv->recent_cpu, 4);
+		calc_pri = fix_sub(dec_pri, div);
+		dec_nice = fix_int(curenv->nice * 2);
+		calc_pri = fix_sub(calc_pri, dec_nice);
+
+		trunc_priority = fix_trunc(calc_pri);
+
+		if(trunc_priority > PRI_MAX)
+			curenv->priority = PRI_MAX;
+
+		else if(trunc_priority < PRI_MIN)
+			curenv->priority = PRI_MIN;
+
+		else
+			curenv->priority = trunc_priority;
+
+		//cprintf("\nRunning Env-> %d --- New Priority: %d\n\n", curenv->env_id, curenv->priority);
+
+		//cprintf("\n--------------------------------------------------------\n");
+	}
 
 	/********DON'T CHANGE THIS LINE***********/
 	ticks++ ;

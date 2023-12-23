@@ -41,6 +41,7 @@ void sched_delete_ready_queues() ;
 //2018:
 //Declaration of helper functions to deal with the env queues
 void init_queue(struct Env_Queue* queue);
+void init_list(struct Env_list* list);
 int queue_size(struct Env_Queue* queue);
 void enqueue(struct Env_Queue* queue, struct Env* env);
 struct Env* dequeue(struct Env_Queue* queue);

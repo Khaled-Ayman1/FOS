@@ -137,7 +137,7 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 				}
 
 				//unmap victim and remove it from list
-				unmap_frame(curenv->env_page_directory, ROUNDDOWN(victim->virtual_address,PAGE_SIZE));
+				unmap_frame(curenv->env_page_directory,victim->virtual_address);
 
 				LIST_REMOVE(&(curenv->page_WS_list), victim);
 
@@ -160,12 +160,14 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 		uint32 ALSize = LIST_SIZE(&(curenv->ActiveList));
 		uint32 SLSize = LIST_SIZE(&(curenv->SecondList));
 		struct FrameInfo* new_frame;
+
 		struct FrameInfo* checked_frame;
 		struct FrameInfo* pushed_frame;
 		//cprintf("\n before lru placement\n");
 		//env_page_ws_print(curenv);
 		//cprintf("\n fault address =%x\n",fault_va);
 		uint32* ptr_page_table1 = NULL;
+
 
 		if((ALSize + SLSize) < (curenv->page_WS_max_size))//one or both of the lists are not full
 		{
@@ -188,10 +190,12 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 				if(flag)
 				{
 					//remove element from the place its is already in then add it at the head
+
 					LIST_REMOVE(&(curenv->ActiveList),checked_frame->element);
 					checked_frame->element = new_element;
 					checked_frame->element->currentList = 0;
 					LIST_INSERT_HEAD(&(curenv->ActiveList),checked_frame->element);
+
 
 				}else
 				{
@@ -211,8 +215,10 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 
 				}
 
+
 			}
 			else
+
 			{
 
 				//active list is full,add to second list, mark it as NOT PRESENT in second list
@@ -231,7 +237,9 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 				{
 					//remove element from the place its is already in then add it at the head
 					//remove found element from second list
+
 					LIST_REMOVE(&(curenv->SecondList),checked_frame->element);
+
 
 					//remove last element from active list
 					LIST_REMOVE(&(curenv->ActiveList), pushed_element);
@@ -283,7 +291,7 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 		}
 		else //both lists are full
 		{
-			//cprintf("\n in replacement\n");
+
 			//TODO: [PROJECT'23.MS3 - #1] [1] PAGE FAULT HANDLER - LRU Replacement
 			struct WorkingSetElement* new_element = env_page_ws_list_create_element(curenv,fault_va);
 			struct WorkingSetElement* pushed_element = LIST_LAST(&(curenv->ActiveList));
@@ -322,6 +330,7 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 				{
 					//remove element from the place its is already in then add it at the head
 					//remove found element from second list
+
 					LIST_REMOVE(&(curenv->SecondList),checked_frame->element);
 
 					//remove last element from active list
@@ -355,8 +364,8 @@ void page_fault_handler(struct Env * curenv, uint32 fault_va)
 					}
 					LIST_REMOVE(&(curenv->SecondList),element_to_eliminate);
 					unmap_frame(curenv->env_page_directory,element_to_eliminate->virtual_address);
+
 					kfree(element_to_eliminate);
-					//env_page_ws_invalidate(curenv,element_to_eliminate->virtual_address);
 
 					//remove last element in active list
 					LIST_REMOVE(&(curenv->ActiveList),pushed_element);

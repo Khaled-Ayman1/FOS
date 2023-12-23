@@ -8,6 +8,7 @@
 #include <kern/mem/memory_manager.h>
 #include <kern/tests/utilities.h>
 #include <kern/cmd/command_prompt.h>
+#include <inc/fixed_point.h>
 
 //void on_clock_update_WS_time_stamps();
 extern void cleanup_buffers(struct Env* e);
@@ -25,6 +26,14 @@ void init_queue(struct Env_Queue* queue)
 	if(queue != NULL)
 	{
 		LIST_INIT(queue);
+	}
+}
+
+void init_list(struct Env_list* list)
+{
+	if(list != NULL)
+	{
+		LIST_INIT(list);
 	}
 }
 
@@ -392,9 +401,10 @@ void sched_kill_env(uint32 envId)
 //=================================================
 void sched_print_all()
 {
-	struct Env* ptr_env ;
+	struct Env* ptr_env;
 	if (!LIST_EMPTY(&env_new_queue))
 	{
+		// Queue Size is correct, for each has a problem
 		cprintf("\nThe processes in NEW queue are:\n");
 		LIST_FOREACH(ptr_env, &env_new_queue)
 		{
@@ -442,11 +452,15 @@ void sched_print_all()
 void sched_run_all()
 {
 	struct Env* ptr_env=NULL;
+
 	LIST_REVERSE(ptr_env, &env_new_queue)
 	{
 		sched_remove_new(ptr_env);
 		sched_insert_ready0(ptr_env);
 	}
+	//------------------------//
+	sched_print_all();
+	//------------------------//
 	/*2015*///if scheduler not run yet, then invoke it!
 	if (scheduler_status == SCH_STOPPED)
 		fos_scheduler();
@@ -545,33 +559,50 @@ int64 timer_ticks()
 int env_get_nice(struct Env* e)
 {
 	//TODO: [PROJECT'23.MS3 - #3] [2] BSD SCHEDULER - env_get_nice
-	//Your code is here
-	//Comment the following line
-	panic("Not implemented yet");
-	return 0;
+
+	return e->nice;
 }
 void env_set_nice(struct Env* e, int nice_value)
 {
 	//TODO: [PROJECT'23.MS3 - #3] [2] BSD SCHEDULER - env_set_nice
-	//Your code is here
-	//Comment the following line
-	panic("Not implemented yet");
+
+	e->nice = nice_value;
+
+	if(e->env_status != ENV_NEW){
+
+		fixed_point_t dec_pri = fix_int(PRI_MAX);
+		fixed_point_t div = fix_unscale(e->recent_cpu, 4);
+		fixed_point_t calc_pri = fix_sub(dec_pri, div);
+		fixed_point_t dec_nice = fix_int(e->nice * 2);
+		calc_pri = fix_sub(calc_pri, dec_nice);
+
+		uint32 trunc_priority = fix_trunc(calc_pri);
+
+		if(trunc_priority > PRI_MAX)
+			e->priority = PRI_MAX;
+
+		else if(trunc_priority < PRI_MIN)
+			e->priority = PRI_MIN;
+
+		else
+			e->priority = trunc_priority;
+
+		cprintf("\nREADY/RUNNING ENV NICE CHANGED - > Priority: %d\n", e->priority);
+	}
 }
 int env_get_recent_cpu(struct Env* e)
 {
 	//TODO: [PROJECT'23.MS3 - #3] [2] BSD SCHEDULER - env_get_recent_cpu
-	//Your code is here
-	//Comment the following line
-	panic("Not implemented yet");
-	return 0;
+
+	fixed_point_t scaled_recent_cpu = fix_scale(e->recent_cpu, 100);
+	return fix_round(scaled_recent_cpu);
 }
 int get_load_average()
 {
 	//TODO: [PROJECT'23.MS3 - #3] [2] BSD SCHEDULER - get_load_average
-	//Your code is here
-	//Comment the following line
-	panic("Not implemented yet");
-	return 0;
+
+	fixed_point_t scaled_load_avg = fix_scale(load_avg, 100);
+	return fix_round(scaled_load_avg);
 }
 /********* for BSD Priority Scheduler *************/
 //==================================================================================//

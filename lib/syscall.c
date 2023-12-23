@@ -333,6 +333,10 @@ void sys_allocate_chunk(uint32 virtual_address, uint32 size, uint32 perms)
 
 
 /*2023*/
+uint32 sys_env_set_nice(struct Env *e)
+{
+	return syscall(SYS_env_set_nice,(uint32) e,0,0,0,0);
+}
 
 uint32 sys_get_uhl(struct Env *e)
 {

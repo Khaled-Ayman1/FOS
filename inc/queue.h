@@ -110,7 +110,7 @@ LIST_INSERT_HEAD(&flist, g, frob_link);	/* add g as first element in list */
 struct name {								\
 	struct type *lh_first;	/* first element */			\
 	struct type *lh_last; \
-	struct type *	___ptr_next; 	/* used as a temp saving place in LIST_FOREACH  */				\
+	struct type *	___ptr_next; 	/* used as a temp saving place in LIST_FOREACH  */	\
 	uint32 size;					/*maintained by list functions */ \
 }
 
@@ -160,7 +160,7 @@ struct {								\
 #define	LIST_NEXT(elm)	((elm)->prev_next_info.le_next)
 
 #define	LOOP_LIST_NEXT(elm)	( (elm == NULL ? NULL : elm->prev_next_info.le_next) )
-#define LOOP_LIST_PREV(elm)    ( (elm == NULL ? NULL : elm->prev_next_info.le_prev) )
+#define	LOOP_LIST_PREV(elm)	( (elm == NULL ? NULL : elm->prev_next_info.le_prev) )
 
 /*
  * Return the element before "elm" in the list.
@@ -186,10 +186,12 @@ struct {								\
 	( (head)->___ptr_next = LOOP_LIST_NEXT((var))) || (var);							\
 	(var) = (head)->___ptr_next)
 
+
 #define LIST_REVERSE(var, head)                    \
     for ((var) = LIST_LAST((head));                    \
     ( (head)->___ptr_next = LOOP_LIST_PREV((var))) || (var);                            \
     (var) = (head)->___ptr_next)
+
 /*
  * Reset the list named "head" to the empty list.
  */

@@ -453,6 +453,7 @@ struct Env * CreateEnv(int number_of_arguments, char **arguments)
 		assert(BSDSchedNiceVal >= -20 && BSDSchedNiceVal <= 20);
 		env_set_nice(env, BSDSchedNiceVal);
 	}
+
 	return env;
 }
 
@@ -484,7 +485,9 @@ int command_kill_program(int number_of_arguments, char **arguments)
 
 int commnad_load_env(int number_of_arguments, char **arguments)
 {
+
 	struct Env *env = CreateEnv(number_of_arguments, arguments);
+
 	if (env == NULL)
 		return 0 ;
 
