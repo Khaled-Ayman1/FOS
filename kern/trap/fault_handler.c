@@ -441,10 +441,7 @@ void placement(struct Env * curenv, uint32 fault_va) {
 				 (fault_va <= USER_HEAP_MAX && fault_va >= USER_HEAP_START)))) {
 					sched_kill_env(curenv->env_id);
 			 }
-			 if((perm & PERM_MARKED) == 0)
-			 {
-				 sched_kill_env(curenv->env_id);
-			 }
+
 		}
 
 

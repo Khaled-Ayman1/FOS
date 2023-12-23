@@ -583,6 +583,9 @@ void* sys_sbrk(int increment)
 	}
 	else if(increment < 0)
 	{
+
+		int fifoFound = 0;
+
 		//cprintf("\n sys_break decrement\n");
 		uint32 temp = increment * -1;
 
@@ -610,13 +613,6 @@ void* sys_sbrk(int increment)
 
 			get_page_table(env->env_page_directory, exStart, &ptr_page_table);
 			ptr_frame_info = get_frame_info(env->env_page_directory,exStart,&ptr_page_table);
-			pt_set_page_permissions(env->env_page_directory, exStart, 0,PERM_MARKED);
-			perm = pt_get_page_permissions(curenv->env_page_directory,exStart);
-
-			if((perm & PERM_PRESENT) == 0){
-				exStart -= PAGE_SIZE;
-				continue;
-			}
 
 			//important, check that it exists and has a page table before freeing
 			//note that it could be in the page_WS_list but doesn't have a page table
@@ -629,10 +625,40 @@ void* sys_sbrk(int increment)
 				continue;
 			}
 
+			pt_set_page_permissions(env->env_page_directory, exStart, 0,PERM_MARKED);
+			perm = pt_get_page_permissions(curenv->env_page_directory,exStart);
+
+			if((perm & PERM_PRESENT) == 0){
+				exStart -= PAGE_SIZE;
+				continue;
+			}
+
+
 			if(ptr_frame_info == 0){
 				exStart -= PAGE_SIZE;
 				continue;
 			}
+
+			//remove it from the fifo list page_WS_list
+			if(isPageReplacmentAlgorithmFIFO() && env->page_last_WS_element != NULL) {
+				struct WorkingSetElement* element;
+				LIST_FOREACH(element, &(env->page_WS_list)) {
+					if (ROUNDDOWN(element->virtual_address, PAGE_SIZE) == ROUNDDOWN(exStart, PAGE_SIZE)) {
+						fifoFound = 1;
+						break;
+					}
+				}
+				if (element != NULL) {
+					//make sure that the element about to be removed wasn't the page_last_WS_element
+					//if it was, make the page_last_WS_element the one after it
+					//if the one after it was NULL then the adjust piece of code below will still perform as expected
+					if (element->virtual_address == env->page_last_WS_element->virtual_address)
+						env->page_last_WS_element = LIST_NEXT(element);
+
+					LIST_REMOVE(&(env->page_WS_list), element);
+				}
+			}
+
 
 			env_page_ws_invalidate(env, exStart);
 
@@ -657,7 +683,7 @@ void* sys_sbrk(int increment)
 				if (curr_element->virtual_address == exStart + PAGE_SIZE)
 					found = 1;
 			}
-			if (found){
+			if (fifoFound){
 
 				if (env->page_last_WS_element != NULL) {
 

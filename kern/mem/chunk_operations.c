@@ -150,16 +150,10 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	uint32* ptr_page_table = NULL;
 
 
+	int fifoFound = 0;
+
 	while(numOfPages > 0){
 
-		pt_set_page_permissions(e->env_page_directory, pagePtr, 0,PERM_MARKED);
-		perm = pt_get_page_permissions(e->env_page_directory,pagePtr);
-
-		if((perm & PERM_PRESENT) == 0){
-			pagePtr += PAGE_SIZE;
-			numOfPages--;
-			continue;
-		}
 
 		//important, check that it exists and has a page table before freeing
 		//discovered in FIFO test "run tfifo2 11"
@@ -170,6 +164,16 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 			numOfPages--;
 			continue;
 		}
+
+		pt_set_page_permissions(e->env_page_directory, pagePtr, 0,PERM_MARKED);
+		perm = pt_get_page_permissions(e->env_page_directory,pagePtr);
+
+		if((perm & PERM_PRESENT) == 0){
+			pagePtr += PAGE_SIZE;
+			numOfPages--;
+			continue;
+		}
+
 
 		//have to remove the freed element from the active or second list in lru
 		if(isPageReplacmentAlgorithmLRU(PG_REP_LRU_LISTS_APPROX)){
@@ -221,7 +225,27 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 		}
 
 
-		if(isPageReplacmentAlgorithmFIFO()){
+		//remove it from the fifo list page_WS_list
+		if(isPageReplacmentAlgorithmFIFO() && e->page_last_WS_element != NULL) {
+			struct WorkingSetElement* element;
+			LIST_FOREACH(element, &(e->page_WS_list)) {
+				if (ROUNDDOWN(element->virtual_address, PAGE_SIZE) == ROUNDDOWN(pagePtr, PAGE_SIZE)) {
+					fifoFound = 1;
+					break;
+				}
+			}
+			if (element != NULL) {
+				//make sure that the element about to be removed wasn't the page_last_WS_element
+				//if it was, make the page_last_WS_element the one after it
+				//if the one after it was NULL then the adjust piece of code below will still perform as expected
+				if (element->virtual_address == e->page_last_WS_element->virtual_address)
+					e->page_last_WS_element = LIST_NEXT(element);
+
+				LIST_REMOVE(&(e->page_WS_list), element);
+			}
+		}
+		if(isPageReplacmentAlgorithmFIFO())
+		{
 			env_page_ws_invalidate(e, pagePtr);
 		}
 
@@ -241,11 +265,7 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	if(isPageReplacmentAlgorithmFIFO() && e->page_last_WS_element != NULL) {
 
 		struct WorkingSetElement* curr_element;
-
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/lruO1
+/**
 		//make sure it exists in the list
 		//so that you don't adjust after free was called with a random address that wasn't in the list to begin with
 		bool found = 0;
@@ -254,7 +274,9 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 				found = 1;
 		}
 		if (!found) return;
+**/
 
+		if (!fifoFound) return;
 
 		if (e->page_last_WS_element != NULL) {
 
