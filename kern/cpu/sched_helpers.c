@@ -29,6 +29,14 @@ void init_queue(struct Env_Queue* queue)
 	}
 }
 
+void init_list(struct Env_list* list)
+{
+	if(list != NULL)
+	{
+		LIST_INIT(list);
+	}
+}
+
 //================================
 // [2] Get queue size:
 //================================
@@ -562,8 +570,10 @@ void env_set_nice(struct Env* e, int nice_value)
 
 	if(e->env_status != ENV_NEW){
 
-		fixed_point_t div = fix_div(e->recent_cpu, fix_int(4));
-		uint32 calc_pri = PRI_MAX - fix_trunc(div) - (e->nice * 2);
+		fixed_point_t div = fix_unscale(e->recent_cpu, 4);
+		uint32 trunc_recent = fix_trunc(div);
+
+		uint32 calc_pri = PRI_MAX - trunc_recent - (e->nice * 2);
 
 		if(calc_pri > PRI_MAX)
 			e->priority = PRI_MAX;
