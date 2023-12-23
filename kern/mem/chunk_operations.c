@@ -153,6 +153,7 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 
 	while(numOfPages > 0){
 
+		pt_set_page_permissions(e->env_page_directory, pagePtr, 0,PERM_MARKED);
 		perm = pt_get_page_permissions(e->env_page_directory,pagePtr);
 
 		if((perm & PERM_PRESENT) == 0){
@@ -173,7 +174,6 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 		}
 
 
-		pt_set_page_permissions(e->env_page_directory, pagePtr, 0, PERM_WRITEABLE | PERM_MARKED);
 
 		env_page_ws_invalidate(e, pagePtr);
 
